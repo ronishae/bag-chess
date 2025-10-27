@@ -44,3 +44,10 @@
     width: 90%;
     height: 90%;
 }
+
+.piece-button {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+}

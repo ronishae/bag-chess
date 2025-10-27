@@ -9,7 +9,7 @@ const INIT = [
     ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
     ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
 ];
-
+const boardState = INIT;
 const board = document.getElementById("board");
 function toLetter(num) {
     return String.fromCharCode("a".charCodeAt(0) + num);
@@ -17,6 +17,12 @@ function toLetter(num) {
 
 function toCoordinate(row, col) {
     return toLetter(col) + (SIZE - row);
+}
+
+function fromCoordinate(coord) {
+    const col = coord.charCodeAt(0) - "a".charCodeAt(0);
+    const row = SIZE - parseInt(coord[1]);
+    return boardState[row][col];
 }
 
 function removeElementsByClass(className) {
@@ -31,6 +37,13 @@ function removeElementsByClass(className) {
     });
 }
 
+function handlePieceClick(event) {
+    const parent = event.target.parentElement;
+    const location = parent.parentElement.id;
+    const pieceType = fromCoordinate(location);
+    console.log(`Piece ${pieceType} clicked at square ${location}`);
+}
+
 function renderBoard(boardState) {
     removeElementsByClass("piece-image");
 
@@ -38,7 +51,13 @@ function renderBoard(boardState) {
         for (let col = 0; col < SIZE; col++) {
             const square = document.getElementById(toCoordinate(row, col));
             if (boardState[row][col] !== ".") {
+                const button = document.createElement("button");
+                button.classList.add("piece-button");
+                button.addEventListener("click", handlePieceClick);
+
                 const piece = document.createElement("img");
+                button.appendChild(piece);
+                
                 piece.classList.add("piece-image");
                 const id = boardState[row][col];
                 if (id === id.toUpperCase()) {
@@ -46,7 +65,7 @@ function renderBoard(boardState) {
                 } else {
                     piece.src = `pieces/b${id.toLowerCase()}.png`;
                 }
-                square.appendChild(piece);
+                square.appendChild(button);
             }
         }
     }

@@ -1,13 +1,21 @@
 const SIZE = 8;
 const INIT = [
-    "rnbqkbnr",
-    "pppppppp",
-    "........",
-    "........",
-    "........",
-    "........",
-    "PPPPPPPP",
-    "RNBQKBNR",
+    // Rank 8
+    ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+    // Rank 7
+    ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+    // Rank 6
+    ['.', '.', '.', '.', '.', '.', '.', '.'],
+    // Rank 5
+    ['.', '.', '.', '.', '.', '.', '.', '.'],
+    // Rank 4
+    ['.', '.', '.', '.', '.', '.', '.', '.'],
+    // Rank 3
+    ['.', '.', '.', '.', '.', '.', '.', '.'],
+    // Rank 2
+    ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+    // Rank 1
+    ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
 ];
 
 const board = document.getElementById("board");
@@ -37,7 +45,7 @@ function renderBoard(boardState) {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             const square = document.getElementById(toCoordinate(row, col));
-            if (boardState[row].charAt(col) !== ".") {
+            if (boardState[row][col] !== ".") {
                 const piece = document.createElement("img");
                 piece.classList.add("piece-image");
                 const id = boardState[row].charAt(col);

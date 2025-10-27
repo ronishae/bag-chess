@@ -1,28 +1,51 @@
-const SIZE = 8
+const SIZE = 8;
 const INIT = [
-    'rnbqkbnr',
-    'pppppppp',
-    '........',
-    '........',
-    '........',
-    '........',
-    'PPPPPPPP',
-    'RNBQKBNR'
+    "rnbqkbnr",
+    "pppppppp",
+    "........",
+    "........",
+    "........",
+    "........",
+    "PPPPPPPP",
+    "RNBQKBNR",
 ];
 
 const board = document.getElementById("board");
+const boardState = INIT;
 
 function toLetter(num) {
     return String.fromCharCode("a".charCodeAt(0) + num);
 }
 
+function toCoordinate(row, col) {
+    return toLetter(col) + (SIZE - row);
+}
+
+function renderBoard() {
+    for (let row = 0; row < SIZE; row++) {
+        for (let col = 0; col < SIZE; col++) {
+            const square = document.getElementById(toCoordinate(row, col));
+            if (boardState[row].charAt(col) !== ".") {
+                const piece = document.createElement("img");
+                piece.classList.add("piece-image");
+                const id = boardState[row].charAt(col);
+                if (id === id.toUpperCase()) {
+                    piece.src = `pieces/${id.toLowerCase()}.png`;
+                } else {
+                    piece.src = `pieces/b${id.toLowerCase()}.png`;
+                }
+                square.appendChild(piece);
+            }
+        }
+    }
+}
 for (let row = 0; row < SIZE; row++) {
     for (let col = 0; col < SIZE; col++) {
         const square = document.createElement("div");
         const coordinateLabel = document.createElement("p");
-        const label = toLetter(col) + (SIZE - row)
+        const label = toCoordinate(row, col);
         coordinateLabel.textContent = label;
-        coordinateLabel.id = label;
+        square.id = label;
         coordinateLabel.classList.add("coord-label");
         square.appendChild(coordinateLabel);
         square.classList.add("square");
@@ -41,3 +64,5 @@ for (let row = 0; row < SIZE; row++) {
         board.appendChild(square);
     }
 }
+
+renderBoard();

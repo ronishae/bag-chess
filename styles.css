@@ -8,9 +8,14 @@
 }
 
 .square {
+    /* for making labels not interact with images */
+    position: relative;
+
+    /* center image */
     display: flex;
     justify-content: center;
     align-items: center;
+
     width: 50px;
     height: 50px;
 }
@@ -24,8 +29,18 @@
 }
 
 .coord-label {
-    color: #444; 
-    font-size: 20px;
+    /* put label in bottom right */
+    position: absolute;
+    left: 30px;
+    top: 16px;
+
+    color: #036b87; 
+    font-size: 15px;
     text-transform: uppercase;
     opacity: 0.6;
+}
+
+.piece-image {
+    width: 90%;
+    height: 90%;
 }

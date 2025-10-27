@@ -1,20 +1,12 @@
 const SIZE = 8;
 const INIT = [
-    // Rank 8
     ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
-    // Rank 7
     ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
-    // Rank 6
     ['.', '.', '.', '.', '.', '.', '.', '.'],
-    // Rank 5
     ['.', '.', '.', '.', '.', '.', '.', '.'],
-    // Rank 4
     ['.', '.', '.', '.', '.', '.', '.', '.'],
-    // Rank 3
     ['.', '.', '.', '.', '.', '.', '.', '.'],
-    // Rank 2
     ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-    // Rank 1
     ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
 ];
 
@@ -48,7 +40,7 @@ function renderBoard(boardState) {
             if (boardState[row][col] !== ".") {
                 const piece = document.createElement("img");
                 piece.classList.add("piece-image");
-                const id = boardState[row].charAt(col);
+                const id = boardState[row][col];
                 if (id === id.toUpperCase()) {
                     piece.src = `pieces/${id.toLowerCase()}.png`;
                 } else {

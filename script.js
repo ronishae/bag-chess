@@ -1,13 +1,13 @@
 const SIZE = 8;
 const INIT = [
-    ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
-    ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
-    ['.', '.', '.', '.', '.', '.', '.', '.'],
-    ['.', '.', '.', '.', '.', '.', '.', '.'],
-    ['.', '.', '.', '.', '.', '.', '.', '.'],
-    ['.', '.', '.', '.', '.', '.', '.', '.'],
-    ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-    ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+    ["r", "n", "b", "q", "k", "b", "n", "r"],
+    ["p", "p", "p", "p", "p", "p", "p", "p"],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", "p", "p", ".", ".", "."],
+    [".", ".", ".", "P", ".", ".", ".", "."],
+    [".", "p", ".", "p", "P", ".", "p", "."],
+    ["P", "P", "P", "P", "P", "P", "P", "P"],
+    ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ];
 const boardState = INIT;
 const board = document.getElementById("board");
@@ -22,6 +22,11 @@ function toCoordinate(row, col) {
 function fromCoordinate(coord) {
     const col = coord.charCodeAt(0) - "a".charCodeAt(0);
     const row = SIZE - parseInt(coord[1]);
+    return [row, col];
+}
+
+function pieceFromCoordinate(coord) {
+    const [row, col] = fromCoordinate(coord);
     return boardState[row][col];
 }
 
@@ -37,11 +42,98 @@ function removeElementsByClass(className) {
     });
 }
 
+function isInBounds(row, col) {
+    return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
+}
+
+function isEmptySquare(row, col) {
+    return boardState[row][col] === ".";
+}
+
+function isBlackPiece(pieceType) {
+    return pieceType === pieceType.toLowerCase() && pieceType !== ".";
+}
+
+function pawnOnStartingRow(row, pieceType) {
+    if (!isBlackPiece(pieceType) && row === 6) return true;
+    if (isBlackPiece(pieceType) && row === 1) return true;
+    return false;
+}
+
+function isSameColour(first, second) {
+    if (first === "." || second === ".") return false;
+    return isBlackPiece(first) === isBlackPiece(second);
+}
+
+// can't simply negate isSameColour due to empty squares
+function isOppositeColour(first, second) {
+    if (first === "." || second === ".") return false;
+    return isBlackPiece(first) !== isBlackPiece(second);
+}
+
+// converts array of [row, col] to string of coordinates
+function convertMoves(moves) {
+    if (!moves) return [];
+    return moves.map(([r, c]) => toCoordinate(r, c)).join(", ");
+}
+
+// get move functions still need to be validated for checks, pins, etc.
+function getPawnMoves(row, col, pieceType) {
+    var canMoveTwo = false;
+    if (pawnOnStartingRow(row, pieceType)) {
+        canMoveTwo = true;
+    }
+    // skip en passant
+    // white pawns move to decreasing row
+    var direction = -1;
+    if (isBlackPiece(pieceType)) direction = 1;
+
+    const moves = [];
+
+    // go forward
+    const target1 = [row + direction, col];
+    if (isInBounds(...target1) && isEmptySquare(...target1)) {
+        moves.push(target1);
+
+        // only check two-square move if one-square move is valid
+        const target2 = [row + 2 * direction, col];
+        if (isInBounds(...target2) && isEmptySquare(...target2)) {
+            moves.push(target2);
+        }
+    }
+
+    // captures
+    const target3 = [row + direction, col - 1];
+    if (
+        isInBounds(...target3) &&
+        isOppositeColour(pieceType, boardState[target3[0]][target3[1]])
+    ) {
+        moves.push(target3);
+    }
+    const target4 = [row + direction, col + 1];
+    if (
+        isInBounds(...target4) &&
+        isOppositeColour(pieceType, boardState[target4[0]][target4[1]])
+    ) {
+        moves.push(target4);
+    }
+
+    return moves;
+}
+
+function getPossibleMoves(row, col, pieceType) {
+    if (pieceType.toLowerCase() === "p") {
+        return getPawnMoves(row, col, pieceType);
+    }
+}
+
 function handlePieceClick(event) {
     const parent = event.target.parentElement;
-    const location = parent.parentElement.id;
-    const pieceType = fromCoordinate(location);
-    console.log(`Piece ${pieceType} clicked at square ${location}`);
+    const square = parent.parentElement.id;
+    const pieceType = pieceFromCoordinate(square);
+    console.log(`Piece ${pieceType} clicked at square ${square}`);
+    const moves = getPossibleMoves(...fromCoordinate(square), pieceType)
+    console.log(convertMoves(moves));
 }
 
 function renderBoard(boardState) {
@@ -57,7 +149,7 @@ function renderBoard(boardState) {
 
                 const piece = document.createElement("img");
                 button.appendChild(piece);
-                
+
                 piece.classList.add("piece-image");
                 const id = boardState[row][col];
                 if (id === id.toUpperCase()) {

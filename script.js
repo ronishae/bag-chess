@@ -1,5 +1,16 @@
-const board = document.getElementById("board");
 const SIZE = 8
+const INIT = [
+    'rnbqkbnr',
+    'pppppppp',
+    '........',
+    '........',
+    '........',
+    '........',
+    'PPPPPPPP',
+    'RNBQKBNR'
+];
+
+const board = document.getElementById("board");
 
 function toLetter(num) {
     return String.fromCharCode("a".charCodeAt(0) + num);

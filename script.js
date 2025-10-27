@@ -21,7 +21,21 @@ function toCoordinate(row, col) {
     return toLetter(col) + (SIZE - row);
 }
 
+function removeElementsByClass(className) {
+    // 1. Select all matching elements
+    const elements = document.querySelectorAll(`.${className}`);
+
+    // 2. Iterate and remove each element
+    // Note: The NodeList returned by querySelectorAll is static, so removing elements 
+    // while iterating is safe.
+    elements.forEach(element => {
+        element.remove();
+    });
+}
+
 function renderBoard() {
+    removeElementsByClass("piece-image");
+
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             const square = document.getElementById(toCoordinate(row, col));
@@ -39,6 +53,7 @@ function renderBoard() {
         }
     }
 }
+
 for (let row = 0; row < SIZE; row++) {
     for (let col = 0; col < SIZE; col++) {
         const square = document.createElement("div");

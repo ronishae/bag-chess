@@ -40,9 +40,14 @@
     opacity: 0.6;
 }
 
+/* if they are not the full square size, user can click behind them on elements I don't expect to be */
 .piece-image {
     width: 100%;
     height: 100%;
+    /* extremely necessary; otherwise it is in-line block. Then the browser adds 3.5px of height as baseline text 
+    below the image, causing the parent .piece-button to be 53.5px high instead of 50px, and it also shifts the image
+    up, which makes a gap below, allowing the user to click the button behind the image (this causes errors). */
+    display: block;
 }
 
 .piece-button {

@@ -99,7 +99,7 @@ function getPawnMoves(row, col, pieceType) {
 
         // only check two-square move if one-square move is valid
         const target2 = [row + 2 * direction, col];
-        if (isInBounds(...target2) && isEmptySquare(boardState, ...target2)) {
+        if (canMoveTwo && isInBounds(...target2) && isEmptySquare(boardState, ...target2)) {
             moves.push(target2);
         }
     }

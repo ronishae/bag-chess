@@ -3,8 +3,8 @@ const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["p", "p", "p", "p", "p", "p", "p", "p"],
     [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", "P", "N", ".", "p", "."],
-    [".", ".", "p", "K", "N", "p", "k", "Q"],
+    [".", ".", ".", "r", "N", ".", "p", "."],
+    [".", ".", "R", "K", "B", "p", "k", "Q"],
     [".", ".", ".", ".", ".", ".", ".", "."],
     ["P", "P", "P", "P", "P", "P", "P", "P"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
@@ -121,8 +121,34 @@ function getPawnMoves(row, col, pieceType) {
     return moves;
 }
 
-function getRookMoves(row, col, pieceType) {
+function getInfiniteDistanceMoves(row, col, directions, pieceType) {
     const moves = [];
+    for (const [dx, dy] of directions) {
+        var targetRow = row;
+        var targetCol = col;
+        // go until out of bounds or blocked
+        while (isInBounds(targetRow + dx, targetCol + dy)) {
+            targetRow += dx;
+            targetCol += dy;
+            if (isEmptySquare(targetRow, targetCol)) {
+                moves.push([targetRow, targetCol]);
+            } else {
+                break;
+            }
+        }
+
+        // if blocked by enemy piece, can capture
+        if (
+            isInBounds(targetRow, targetCol) &&
+            isOppositeColour(pieceType, boardState[targetRow][targetCol])
+        ) {
+            moves.push([targetRow, targetCol]);
+        }
+    }
+    return moves;
+}
+
+function getRookMoves(row, col, pieceType) {
     // up, right, down, left
     const directions = [
         [-1, 0],
@@ -131,34 +157,10 @@ function getRookMoves(row, col, pieceType) {
         [0, -1],
     ];
 
-    for (const [dx, dy] of directions) {
-        var targetRow = row;
-        var targetCol = col;
-        // go until out of bounds or blocked
-        while (isInBounds(targetRow + dx, targetCol + dy)) {
-            targetRow += dx;
-            targetCol += dy;
-            if (isEmptySquare(targetRow, targetCol)) {
-                moves.push([targetRow, targetCol]);
-            } else {
-                break;
-            }
-        }
-
-        // if blocked by enemy piece, can capture
-        if (
-            isInBounds(targetRow, targetCol) &&
-            isOppositeColour(pieceType, boardState[targetRow][targetCol])
-        ) {
-            moves.push([targetRow, targetCol]);
-        }
-    }
-
-    return moves;
+    return getInfiniteDistanceMoves(row, col, directions, pieceType);
 }
 
 function getBishopMoves(row, col, pieceType) {
-    const moves = [];
     // up-right, down-right, down-left, up-left
     const directions = [
         [-1, 1],
@@ -167,29 +169,7 @@ function getBishopMoves(row, col, pieceType) {
         [-1, -1],
     ];
 
-    for (const [dx, dy] of directions) {
-        var targetRow = row;
-        var targetCol = col;
-        // go until out of bounds or blocked
-        while (isInBounds(targetRow + dx, targetCol + dy)) {
-            targetRow += dx;
-            targetCol += dy;
-            if (isEmptySquare(targetRow, targetCol)) {
-                moves.push([targetRow, targetCol]);
-            } else {
-                break;
-            }
-        }
-
-        // if blocked by enemy piece, can capture
-        if (
-            isInBounds(targetRow, targetCol) &&
-            isOppositeColour(pieceType, boardState[targetRow][targetCol])
-        ) {
-            moves.push([targetRow, targetCol]);
-        }
-    }
-    return moves;
+    return getInfiniteDistanceMoves(row, col, directions, pieceType);
 }
 
 function getQueenMoves(row, col, pieceType) {

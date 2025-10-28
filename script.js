@@ -400,6 +400,50 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
     });
 }
 
+function detectCheckmate() {
+    const inCheck = isInCheck(boardState, turn);
+    // must be in check to be checkmate
+    if (!inCheck) {
+        return;
+    }
+
+    // iterate through all pieces of the current player and look for legal moves.
+    let legalMoveExists = false;
+
+    for (let row = 0; row < SIZE; row++) {
+        for (let col = 0; col < SIZE; col++) {
+            const pieceType = boardState[row][col];
+            if (pieceType === ".") continue;
+
+            const isMyPiece =
+                (turn === "W" && !isBlackPiece(pieceType)) ||
+                (turn === "B" && isBlackPiece(pieceType));
+
+            if (isMyPiece) {
+                const possibleMoves = getPossibleMoves(row, col, pieceType);
+
+                // find moves that do not leave king in check
+                const legalMoves = getLegalMoves(row, col, pieceType, possibleMoves);
+
+                // not checkmate if any legal move exists
+                if (legalMoves.length > 0) {
+                    legalMoveExists = true;
+                    break;
+                }
+            }
+        }
+        if (legalMoveExists) {
+            break;
+        }
+    }
+
+    // checkmate
+    if (!legalMoveExists) {
+        console.log("Checkmate! Game Over.");
+        // TODO: disable buttons and implement end of game
+    }
+}
+
 function makeMove(pieceType, startRow, startCol, event) {
     const parent = event.target.parentElement;
     const square = parent.id;
@@ -416,6 +460,7 @@ function makeMove(pieceType, startRow, startCol, event) {
     const [kingRow, kingCol] = locateKing(boardState, turn);
     clearIndicators();
     renderBoard(boardState, inCheck, kingRow, kingCol);
+    detectCheckmate();
 }
 
 function clearIndicators() {

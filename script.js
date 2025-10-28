@@ -3,8 +3,8 @@ const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["p", "p", "p", "p", "p", "p", "p", "p"],
     [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", "r", "N", ".", "p", "."],
-    [".", ".", "R", "K", "B", "p", "k", "Q"],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     ["P", "P", "P", "P", "P", "P", "P", "P"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
@@ -187,10 +187,7 @@ function getSetDistanceMoves(row, col, directions, pieceType) {
         if (isInBounds(targetRow, targetCol)) {
             if (
                 isEmptySquare(targetRow, targetCol) ||
-                isOppositeColour(
-                    pieceType,
-                    boardState[targetRow][targetCol]
-                )
+                isOppositeColour(pieceType, boardState[targetRow][targetCol])
             ) {
                 moves.push([targetRow, targetCol]);
             }
@@ -226,7 +223,7 @@ function getKnightMoves(row, col, pieceType) {
         [-1, 2],
         [1, 2],
         [2, 1],
-        [2, -1],    
+        [2, -1],
         [1, -2],
         [-1, -2],
     ];
@@ -247,7 +244,7 @@ function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "q") {
         return getQueenMoves(row, col, pieceType);
     }
-    if (pieceType.toLowerCase() === "k") { 
+    if (pieceType.toLowerCase() === "k") {
         return getKingMoves(row, col, pieceType);
     }
     if (pieceType.toLowerCase() === "n") {
@@ -257,23 +254,36 @@ function getPossibleMoves(row, col, pieceType) {
     return [];
 }
 
-function makeMove(event) {
+function makeMove(pieceType, startRow, startCol, event) {
     const parent = event.target.parentElement;
     const square = parent.id;
-    console.log(`Move made to square ${square}`);
+    const [row, col] = fromCoordinate(square);
+    boardState[startRow][startCol] = ".";
+
+    boardState[row][col] = pieceType;
+    renderBoard(boardState);
+    clearMoveIndicators();
 }
 
-function renderMoves(moves) {
+function clearMoveIndicators() {
     removeElementsByClass("move-indicator");
     removeElementsByClass("capture-indicator");
+}
+
+// pieceType is the piece being moved
+function renderMoves(pieceType, startRow, startCol, moves) {
+    clearMoveIndicators();
 
     for (const coordinate of moves) {
-        const square = document.getElementById(coordinate);
-        const indicator = document.createElement("button");
-        indicator.addEventListener("click", makeMove);
-        indicator.classList.add("move-button");
-
         const [row, col] = fromCoordinate(coordinate);
+        const square = document.getElementById(coordinate);
+
+        const indicator = document.createElement("button");
+        indicator.addEventListener("click", (event) => {
+            makeMove(pieceType, startRow, startCol, event);
+        });
+        indicator.classList.add("move-button");
+        
         // guaranteed it is an opponent piece (via the getPossibleMoves call) if not empty square
         if (boardState[row][col] !== ".") {
             indicator.classList.add("capture-indicator");
@@ -288,10 +298,9 @@ function handlePieceClick(event) {
     const parent = event.target.parentElement;
     const square = parent.parentElement.id;
     const pieceType = pieceFromCoordinate(square);
-    // console.log(`Piece ${pieceType} clicked at square ${square}`);
+
     const moves = getPossibleMoves(...fromCoordinate(square), pieceType);
-    console.log(convertMoves(moves));
-    renderMoves(convertMoves(moves));
+    renderMoves(pieceType, ...fromCoordinate(square), convertMoves(moves));
 }
 
 function renderBoard(boardState) {

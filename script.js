@@ -74,7 +74,7 @@ function isOppositeColour(first, second) {
 // converts array of [row, col] to string of coordinates
 function convertMoves(moves) {
     if (!moves) return [];
-    return moves.map(([r, c]) => toCoordinate(r, c)).join(", ");
+    return moves.map(([r, c]) => toCoordinate(r, c));
 }
 
 // all the get move functions still need to be validated for checks, pins, can't capture king
@@ -257,13 +257,41 @@ function getPossibleMoves(row, col, pieceType) {
     return [];
 }
 
+function makeMove(event) {
+    const parent = event.target.parentElement;
+    const square = parent.id;
+    console.log(`Move made to square ${square}`);
+}
+
+function renderMoves(moves) {
+    removeElementsByClass("move-indicator");
+    removeElementsByClass("capture-indicator");
+
+    for (const coordinate of moves) {
+        const square = document.getElementById(coordinate);
+        const indicator = document.createElement("button");
+        indicator.addEventListener("click", makeMove);
+        indicator.classList.add("move-button");
+
+        const [row, col] = fromCoordinate(coordinate);
+        // guaranteed it is an opponent piece (via the getPossibleMoves call) if not empty square
+        if (boardState[row][col] !== ".") {
+            indicator.classList.add("capture-indicator");
+        } else {
+            indicator.classList.add("move-indicator");
+        }
+        square.appendChild(indicator);
+    }
+}
+
 function handlePieceClick(event) {
     const parent = event.target.parentElement;
     const square = parent.parentElement.id;
     const pieceType = pieceFromCoordinate(square);
-    console.log(`Piece ${pieceType} clicked at square ${square}`);
+    // console.log(`Piece ${pieceType} clicked at square ${square}`);
     const moves = getPossibleMoves(...fromCoordinate(square), pieceType);
     console.log(convertMoves(moves));
+    renderMoves(convertMoves(moves));
 }
 
 function renderBoard(boardState) {

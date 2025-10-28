@@ -71,7 +71,7 @@
     
     border-radius: 50%;
 
-    background-color: #ef4444;
+    background-color: #15aafa;
 }
 
 /* box */
@@ -79,5 +79,14 @@
     position: absolute;
     width: 100%;
     height: 100%;
-    border: 4px solid #ef4444;
+    border: 4px solid #15aafa;
+}
+
+.check-indicator {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 4px solid #ef4444; /* yellow */
+    /* not sure why this indicator specifically needs it. must be something with how the parent-child tree looks */
+    box-sizing: border-box; 
 }

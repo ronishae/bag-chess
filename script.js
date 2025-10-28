@@ -231,6 +231,133 @@ function getKnightMoves(row, col, pieceType) {
     return getSetDistanceMoves(row, col, directions, pieceType);
 }
 
+function locateKing(colour) {
+    for (let row = 0; row < SIZE; row++) {
+        for (let col = 0; col < SIZE; col++) {
+            const piece = boardState[row][col];
+            if (colour === "W" && piece === "K") {
+                return [row, col];
+            }
+            if (colour === "B" && piece === "k") {
+                return [row, col];
+            }
+        }
+    }
+    console.error("Could not locate king of colour: ", colour);
+    return [-1, -1];
+}
+
+// e.g. R, Q, N, etc...
+function hasAttackerAt(row, col, myColour, expectedAttackerType) {
+    if (!isInBounds(row, col)) return false;
+    const piece = boardState[row][col];
+    if (piece === ".") return false;
+
+    return (
+        isOppositeColour(myColour, piece) &&
+        piece.toLowerCase() === expectedAttackerType.toLowerCase()
+    );
+}
+
+// TODO: refactor
+// colour is "W" or "B"
+function isInCheck(colour) {
+    const [kingRow, kingCol] = locateKing(colour);
+    const kingPiece = boardState[kingRow][kingCol];
+    // white
+    let pawnAttackers = [
+        [-1, -1],
+        [-1, 1],
+    ];
+
+    if (colour === "B") {
+        pawnAttackers = [
+            [1, -1],
+            [1, 1],
+        ];
+    }
+
+    for (let [dx, dy] of pawnAttackers) {
+        if (hasAttackerAt(kingRow + dx, kingCol + dy, kingPiece, "P")) {
+            return true;
+        }
+    }
+    const knightAttackers = [
+        [-2, -1],
+        [-2, 1],
+        [-1, 2],
+        [1, 2],
+        [2, 1],
+        [2, -1],
+        [1, -2],
+        [-1, -2],
+    ];
+
+    for (let [dx, dy] of knightAttackers) {
+        if (hasAttackerAt(kingRow + dx, kingCol + dy, kingPiece, "N")) {
+            return true;
+        }
+    }
+
+    const rookDirections = [
+        [-1, 0],
+        [0, 1],
+        [1, 0],
+        [0, -1],
+    ];
+
+    const bishopDirections = [
+        [-1, 1],
+        [1, 1],
+        [1, -1],
+        [-1, -1],
+    ];
+
+    for (let [dx, dy] of rookDirections) {
+        var targetRow = kingRow;
+        var targetCol = kingCol;
+        // go until out of bounds or blocked
+        while (isInBounds(targetRow + dx, targetCol + dy)) {
+            targetRow += dx;
+            targetCol += dy;
+            var attacker = boardState[targetRow][targetCol];
+            if (
+                isOppositeColour(attacker, kingPiece) &&
+                ["r", "q"].includes(attacker.toLowerCase())
+            ) {
+                return true;
+            // blocked, stop checking this direction
+            } else if (!isEmptySquare(targetRow, targetCol)) {
+                break;
+            }
+            // continue otherwise
+        }
+    }
+
+    for (let [dx, dy] of bishopDirections) {
+        var targetRow = kingRow;
+        var targetCol = kingCol;
+        // go until out of bounds or blocked
+        while (isInBounds(targetRow + dx, targetCol + dy)) {
+            targetRow += dx;
+            targetCol += dy;
+            var attacker = boardState[targetRow][targetCol];
+            if (
+                isOppositeColour(attacker, kingPiece) &&
+                ["b", "q"].includes(attacker.toLowerCase())
+            ) {
+                return true;
+            // blocked, stop checking this direction
+            } else if (!isEmptySquare(targetRow, targetCol)) {
+                break;
+            }
+            // continue otherwise
+        }
+    }
+
+    return false;
+}
+
 function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
@@ -266,18 +393,21 @@ function makeMove(pieceType, startRow, startCol, event) {
     } else {
         turn = "W";
     }
-    renderBoard(boardState);
-    clearMoveIndicators();
+    const inCheck = isInCheck(turn);
+    const [kingRow, kingCol] = locateKing(turn);
+    clearIndicators();
+    renderBoard(boardState, inCheck, kingRow, kingCol);
 }
 
-function clearMoveIndicators() {
+function clearIndicators() {
+    removeElementsByClass("check-indicator")
     removeElementsByClass("move-indicator");
     removeElementsByClass("capture-indicator");
 }
 
 // pieceType is the piece being moved
 function renderMoves(pieceType, startRow, startCol, moves) {
-    clearMoveIndicators();
+    clearIndicators();
 
     for (const coordinate of moves) {
         const [row, col] = fromCoordinate(coordinate);
@@ -308,7 +438,7 @@ function handlePieceClick(event) {
     renderMoves(pieceType, ...fromCoordinate(square), convertMoves(moves));
 }
 
-function renderBoard(boardState) {
+function renderBoard(boardState, check, checkedRow, checkedCol) {
     // clear board to prevent id duplication
     removeElementsByClass("piece-image");
 
@@ -317,7 +447,9 @@ function renderBoard(boardState) {
             if (boardState[row][col] === ".") continue;
             const square = document.getElementById(toCoordinate(row, col));
             
+            // each piece is a button
             const button = document.createElement("button");
+            
             button.classList.add("piece-button");
             if (
                 (isBlackPiece(boardState[row][col]) && turn === "B") ||
@@ -327,9 +459,9 @@ function renderBoard(boardState) {
             }
             // TODO: disable / hide button and change cursor otherwise
 
+            // put image inside button
             const piece = document.createElement("img");
             button.appendChild(piece);
-
             piece.classList.add("piece-image");
             const id = boardState[row][col];
             if (id === id.toUpperCase()) {
@@ -337,7 +469,15 @@ function renderBoard(boardState) {
             } else {
                 piece.src = `pieces/b${id.toLowerCase()}.png`;
             }
+
+            // put button in square
             square.appendChild(button);
+
+            if (check && row === checkedRow && col === checkedCol) {
+                const indicator = document.createElement("div");
+                indicator.classList.add("check-indicator");
+                square.appendChild(indicator);
+            }
         }
     }
 }

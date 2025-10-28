@@ -48,8 +48,8 @@ function isInBounds(row, col) {
     return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
 }
 
-function isEmptySquare(row, col) {
-    return boardState[row][col] === ".";
+function isEmptySquare(board, row, col) {
+    return board[row][col] === ".";
 }
 
 function isBlackPiece(pieceType) {
@@ -94,12 +94,12 @@ function getPawnMoves(row, col, pieceType) {
 
     // go forward
     const target1 = [row + direction, col];
-    if (isInBounds(...target1) && isEmptySquare(...target1)) {
+    if (isInBounds(...target1) && isEmptySquare(boardState, ...target1)) {
         moves.push(target1);
 
         // only check two-square move if one-square move is valid
         const target2 = [row + 2 * direction, col];
-        if (isInBounds(...target2) && isEmptySquare(...target2)) {
+        if (isInBounds(...target2) && isEmptySquare(boardState, ...target2)) {
             moves.push(target2);
         }
     }
@@ -132,7 +132,7 @@ function getInfiniteDistanceMoves(row, col, directions, pieceType) {
         while (isInBounds(targetRow + dx, targetCol + dy)) {
             targetRow += dx;
             targetCol += dy;
-            if (isEmptySquare(targetRow, targetCol)) {
+            if (isEmptySquare(boardState, targetRow, targetCol)) {
                 moves.push([targetRow, targetCol]);
             } else {
                 break;
@@ -188,7 +188,7 @@ function getSetDistanceMoves(row, col, directions, pieceType) {
         const targetCol = col + dy;
         if (isInBounds(targetRow, targetCol)) {
             if (
-                isEmptySquare(targetRow, targetCol) ||
+                isEmptySquare(boardState, targetRow, targetCol) ||
                 isOppositeColour(pieceType, boardState[targetRow][targetCol])
             ) {
                 moves.push([targetRow, targetCol]);
@@ -231,10 +231,10 @@ function getKnightMoves(row, col, pieceType) {
     return getSetDistanceMoves(row, col, directions, pieceType);
 }
 
-function locateKing(colour) {
+function locateKing(board, colour) {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
-            const piece = boardState[row][col];
+            const piece = board[row][col];
             if (colour === "W" && piece === "K") {
                 return [row, col];
             }
@@ -248,9 +248,9 @@ function locateKing(colour) {
 }
 
 // e.g. R, Q, N, etc...
-function hasAttackerAt(row, col, myColour, expectedAttackerType) {
+function hasAttackerAt(board, row, col, myColour, expectedAttackerType) {
     if (!isInBounds(row, col)) return false;
-    const piece = boardState[row][col];
+    const piece = board[row][col];
     if (piece === ".") return false;
 
     return (
@@ -261,9 +261,9 @@ function hasAttackerAt(row, col, myColour, expectedAttackerType) {
 
 // TODO: refactor
 // colour is "W" or "B"
-function isInCheck(colour) {
-    const [kingRow, kingCol] = locateKing(colour);
-    const kingPiece = boardState[kingRow][kingCol];
+function isInCheck(board, colour) {
+    const [kingRow, kingCol] = locateKing(board, colour);
+    const kingPiece = board[kingRow][kingCol];
     // white
     let pawnAttackers = [
         [-1, -1],
@@ -278,7 +278,7 @@ function isInCheck(colour) {
     }
 
     for (let [dx, dy] of pawnAttackers) {
-        if (hasAttackerAt(kingRow + dx, kingCol + dy, kingPiece, "P")) {
+        if (hasAttackerAt(board, kingRow + dx, kingCol + dy, kingPiece, "P")) {
             return true;
         }
     }
@@ -294,7 +294,7 @@ function isInCheck(colour) {
     ];
 
     for (let [dx, dy] of knightAttackers) {
-        if (hasAttackerAt(kingRow + dx, kingCol + dy, kingPiece, "N")) {
+        if (hasAttackerAt(board, kingRow + dx, kingCol + dy, kingPiece, "N")) {
             return true;
         }
     }
@@ -320,14 +320,14 @@ function isInCheck(colour) {
         while (isInBounds(targetRow + dx, targetCol + dy)) {
             targetRow += dx;
             targetCol += dy;
-            var attacker = boardState[targetRow][targetCol];
+            var attacker = board[targetRow][targetCol];
             if (
                 isOppositeColour(attacker, kingPiece) &&
                 ["r", "q"].includes(attacker.toLowerCase())
             ) {
                 return true;
             // blocked, stop checking this direction
-            } else if (!isEmptySquare(targetRow, targetCol)) {
+            } else if (!isEmptySquare(board, targetRow, targetCol)) {
                 break;
             }
             // continue otherwise
@@ -341,14 +341,14 @@ function isInCheck(colour) {
         while (isInBounds(targetRow + dx, targetCol + dy)) {
             targetRow += dx;
             targetCol += dy;
-            var attacker = boardState[targetRow][targetCol];
+            var attacker = board[targetRow][targetCol];
             if (
                 isOppositeColour(attacker, kingPiece) &&
                 ["b", "q"].includes(attacker.toLowerCase())
             ) {
                 return true;
             // blocked, stop checking this direction
-            } else if (!isEmptySquare(targetRow, targetCol)) {
+            } else if (!isEmptySquare(board, targetRow, targetCol)) {
                 break;
             }
             // continue otherwise
@@ -381,20 +381,39 @@ function getPossibleMoves(row, col, pieceType) {
     return [];
 }
 
+function updateBoard(board, pieceType, startRow, startCol, targetRow, targetCol) {
+    board[startRow][startCol] = ".";
+    board[targetRow][targetCol] = pieceType;
+}
+
+// will need to handle castling specifically later
+function getLegalMoves(startRow, startCol, pieceType, moves) {
+    // for a move to be legal, your king cannot be in check next turn
+    // (whether or not you were put in check, or if the move is putting yourself in check)
+    return moves.filter(([row, col]) => {
+        const hypotheticalBoard = structuredClone(boardState);
+        updateBoard(hypotheticalBoard, pieceType, startRow, startCol, row, col);
+        if (isInCheck(hypotheticalBoard, turn)) {
+            return false;
+        }
+        return true;
+    });
+}
+
 function makeMove(pieceType, startRow, startCol, event) {
     const parent = event.target.parentElement;
     const square = parent.id;
     const [row, col] = fromCoordinate(square);
-    boardState[startRow][startCol] = ".";
+    
+    updateBoard(boardState, pieceType, startRow, startCol, row, col);
 
-    boardState[row][col] = pieceType;
     if (turn === "W") {
         turn = "B";
     } else {
         turn = "W";
     }
-    const inCheck = isInCheck(turn);
-    const [kingRow, kingCol] = locateKing(turn);
+    const inCheck = isInCheck(boardState, turn);
+    const [kingRow, kingCol] = locateKing(boardState, turn);
     clearIndicators();
     renderBoard(boardState, inCheck, kingRow, kingCol);
 }
@@ -434,17 +453,17 @@ function handlePieceClick(event) {
     const square = parent.parentElement.id;
     const pieceType = pieceFromCoordinate(square);
 
-    const moves = getPossibleMoves(...fromCoordinate(square), pieceType);
+    const moves = getLegalMoves(...fromCoordinate(square), pieceType, getPossibleMoves(...fromCoordinate(square), pieceType));
     renderMoves(pieceType, ...fromCoordinate(square), convertMoves(moves));
 }
 
-function renderBoard(boardState, check, checkedRow, checkedCol) {
+function renderBoard(board, check, checkedRow, checkedCol) {
     // clear board to prevent id duplication
     removeElementsByClass("piece-image");
 
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
-            if (boardState[row][col] === ".") continue;
+            if (board[row][col] === ".") continue;
             const square = document.getElementById(toCoordinate(row, col));
             
             // each piece is a button
@@ -452,8 +471,8 @@ function renderBoard(boardState, check, checkedRow, checkedCol) {
             
             button.classList.add("piece-button");
             if (
-                (isBlackPiece(boardState[row][col]) && turn === "B") ||
-                (!isBlackPiece(boardState[row][col]) && turn === "W")
+                (isBlackPiece(board[row][col]) && turn === "B") ||
+                (!isBlackPiece(board[row][col]) && turn === "W")
             ) {
                 button.addEventListener("click", handlePieceClick);
             }
@@ -463,7 +482,7 @@ function renderBoard(boardState, check, checkedRow, checkedCol) {
             const piece = document.createElement("img");
             button.appendChild(piece);
             piece.classList.add("piece-image");
-            const id = boardState[row][col];
+            const id = board[row][col];
             if (id === id.toUpperCase()) {
                 piece.src = `pieces/${id.toLowerCase()}.png`;
             } else {

@@ -2,9 +2,9 @@ const SIZE = 8;
 const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["p", "p", "p", "p", "p", "p", "p", "p"],
-    [".", ".", ".", ".", ".", "B", ".", "."],
-    [".", ".", ".", ".", ".", ".", "b", "."],
-    [".", ".", ".", "b", ".", ".", "B", "."],
+    [".", ".", ".", ".", ".", "Q", ".", "."],
+    [".", ".", ".", ".", ".", ".", "q", "."],
+    [".", ".", ".", "q", ".", ".", "Q", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     ["P", "P", "P", "P", "P", "P", "P", "P"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
@@ -192,6 +192,13 @@ function getBishopMoves(row, col, pieceType) {
     return moves;
 }
 
+function getQueenMoves(row, col, pieceType) {
+    // rook and bishop moves combined; they are mutually exclusive
+    const rookMoves = getRookMoves(row, col, pieceType);
+    const bishopMoves = getBishopMoves(row, col, pieceType);
+    return [...rookMoves, ...bishopMoves];
+}
+
 function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
@@ -201,6 +208,9 @@ function getPossibleMoves(row, col, pieceType) {
     }
     if (pieceType.toLowerCase() === "b") {
         return getBishopMoves(row, col, pieceType);
+    }
+    if (pieceType.toLowerCase() === "q") {
+        return getQueenMoves(row, col, pieceType);
     }
 }
 

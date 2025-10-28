@@ -2,9 +2,9 @@ const SIZE = 8;
 const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["p", "p", "p", "p", "p", "p", "p", "p"],
-    [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", ".", ".", ".", "r", "."],
-    [".", ".", ".", "R", ".", ".", "r", "."],
+    [".", ".", ".", ".", ".", "B", ".", "."],
+    [".", ".", ".", ".", ".", ".", "b", "."],
+    [".", ".", ".", "b", ".", ".", "B", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     ["P", "P", "P", "P", "P", "P", "P", "P"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
@@ -132,8 +132,8 @@ function getRookMoves(row, col, pieceType) {
     ];
 
     for (const [dx, dy] of directions) {
-        targetRow = row;
-        targetCol = col;
+        var targetRow = row;
+        var targetCol = col;
         // go until out of bounds or blocked
         while (isInBounds(targetRow + dx, targetCol + dy)) {
             targetRow += dx;
@@ -157,12 +157,50 @@ function getRookMoves(row, col, pieceType) {
     return moves;
 }
 
+function getBishopMoves(row, col, pieceType) {
+    const moves = [];
+    // up-right, down-right, down-left, up-left
+    const directions = [
+        [-1, 1],
+        [1, 1],
+        [1, -1],
+        [-1, -1],
+    ];
+
+    for (const [dx, dy] of directions) {
+        var targetRow = row;
+        var targetCol = col;
+        // go until out of bounds or blocked
+        while (isInBounds(targetRow + dx, targetCol + dy)) {
+            targetRow += dx;
+            targetCol += dy;
+            if (isEmptySquare(targetRow, targetCol)) {
+                moves.push([targetRow, targetCol]);
+            } else {
+                break;
+            }
+        }
+
+        // if blocked by enemy piece, can capture
+        if (
+            isInBounds(targetRow, targetCol) &&
+            isOppositeColour(pieceType, boardState[targetRow][targetCol])
+        ) {
+            moves.push([targetRow, targetCol]);
+        }
+    }
+    return moves;
+}
+
 function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
     }
     if (pieceType.toLowerCase() === "r") {
         return getRookMoves(row, col, pieceType);
+    }
+    if (pieceType.toLowerCase() === "b") {
+        return getBishopMoves(row, col, pieceType);
     }
 }
 

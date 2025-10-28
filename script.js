@@ -10,6 +10,8 @@ const INIT = [
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ];
 const boardState = INIT;
+var turn = "W"; // 'W' for White's turn, 'B' for Black
+
 const board = document.getElementById("board");
 function toLetter(num) {
     return String.fromCharCode("a".charCodeAt(0) + num);
@@ -261,6 +263,11 @@ function makeMove(pieceType, startRow, startCol, event) {
     boardState[startRow][startCol] = ".";
 
     boardState[row][col] = pieceType;
+    if (turn === "W") {
+        turn = "B";
+    } else {
+        turn = "W";
+    }
     renderBoard(boardState);
     clearMoveIndicators();
 }
@@ -283,7 +290,7 @@ function renderMoves(pieceType, startRow, startCol, moves) {
             makeMove(pieceType, startRow, startCol, event);
         });
         indicator.classList.add("move-button");
-        
+
         // guaranteed it is an opponent piece (via the getPossibleMoves call) if not empty square
         if (boardState[row][col] !== ".") {
             indicator.classList.add("capture-indicator");
@@ -313,7 +320,13 @@ function renderBoard(boardState) {
             if (boardState[row][col] !== ".") {
                 const button = document.createElement("button");
                 button.classList.add("piece-button");
-                button.addEventListener("click", handlePieceClick);
+                if (
+                    (isBlackPiece(boardState[row][col]) && turn === "B") ||
+                    (!isBlackPiece(boardState[row][col]) && turn === "W")
+                ) {
+                    button.addEventListener("click", handlePieceClick);
+                }
+                // TODO: disable / hide button and change cursor otherwise
 
                 const piece = document.createElement("img");
                 button.appendChild(piece);

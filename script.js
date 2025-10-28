@@ -3,7 +3,7 @@ const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["p", "p", "p", "p", "p", "p", "p", "p"],
     [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", "P", ".", ".", "p", "."],
+    [".", ".", ".", "P", "N", ".", "p", "."],
     [".", ".", "p", "K", "N", "p", "k", "Q"],
     [".", ".", ".", ".", ".", ".", ".", "."],
     ["P", "P", "P", "P", "P", "P", "P", "P"],
@@ -199,20 +199,8 @@ function getQueenMoves(row, col, pieceType) {
     return [...rookMoves, ...bishopMoves];
 }
 
-function getKingMoves(row, col, pieceType) {
+function getSetDistanceMoves(row, col, directions, pieceType) {
     const moves = [];
-    // all 8 directions
-    const directions = [
-        [-1, 0],
-        [-1, 1],
-        [0, 1],
-        [1, 1],
-        [1, 0],
-        [1, -1],
-        [0, -1],
-        [-1, -1],
-    ];
-
     for (const [dx, dy] of directions) {
         const targetRow = row + dx;
         const targetCol = col + dy;
@@ -232,6 +220,40 @@ function getKingMoves(row, col, pieceType) {
     return moves;
 }
 
+function getKingMoves(row, col, pieceType) {
+    const moves = [];
+    // all 8 directions
+    const directions = [
+        [-1, 0],
+        [-1, 1],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+        [1, -1],
+        [0, -1],
+        [-1, -1],
+    ];
+
+    return getSetDistanceMoves(row, col, directions, pieceType);
+}
+
+function getKnightMoves(row, col, pieceType) {
+    const moves = [];
+    // all 8 L-shapes
+    const directions = [
+        [-2, -1],
+        [-2, 1],
+        [-1, 2],
+        [1, 2],
+        [2, 1],
+        [2, -1],    
+        [1, -2],
+        [-1, -2],
+    ];
+
+    return getSetDistanceMoves(row, col, directions, pieceType);
+}
+
 function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
@@ -248,6 +270,11 @@ function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "k") { 
         return getKingMoves(row, col, pieceType);
     }
+    if (pieceType.toLowerCase() === "n") {
+        return getKnightMoves(row, col, pieceType);
+    }
+    console.log("Error. Unknown piece type:", pieceType);
+    return [];
 }
 
 function handlePieceClick(event) {

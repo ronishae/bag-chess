@@ -469,6 +469,7 @@ function renderBoard(board, check, checkedRow, checkedCol) {
             // each piece is a button
             const button = document.createElement("button");
             
+            // activate button and attach handler
             button.classList.add("piece-button");
             if (
                 (isBlackPiece(board[row][col]) && turn === "B") ||
@@ -477,6 +478,14 @@ function renderBoard(board, check, checkedRow, checkedCol) {
                 button.addEventListener("click", handlePieceClick);
             }
             // TODO: disable / hide button and change cursor otherwise
+
+            // Indicate check; put inside button so the user can still select the button to move the king
+            // Since position is absolute, this does not impace the rendering of the elements
+            if (check && row === checkedRow && col === checkedCol) {
+                const indicator = document.createElement("div");
+                indicator.classList.add("check-indicator");
+                button.appendChild(indicator);
+            }
 
             // put image inside button
             const piece = document.createElement("img");
@@ -491,12 +500,6 @@ function renderBoard(board, check, checkedRow, checkedCol) {
 
             // put button in square
             square.appendChild(button);
-
-            if (check && row === checkedRow && col === checkedCol) {
-                const indicator = document.createElement("div");
-                indicator.classList.add("check-indicator");
-                square.appendChild(indicator);
-            }
         }
     }
 }

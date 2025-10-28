@@ -3,9 +3,9 @@ const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["p", "p", "p", "p", "p", "p", "p", "p"],
     [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", "p", "p", ".", ".", "."],
-    [".", ".", ".", "P", ".", ".", ".", "."],
-    [".", "p", ".", "p", "P", ".", "p", "."],
+    [".", ".", ".", ".", ".", ".", "r", "."],
+    [".", ".", ".", "R", ".", ".", "r", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
     ["P", "P", "P", "P", "P", "P", "P", "P"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ];
@@ -77,7 +77,7 @@ function convertMoves(moves) {
     return moves.map(([r, c]) => toCoordinate(r, c)).join(", ");
 }
 
-// get move functions still need to be validated for checks, pins, etc.
+// all the get move functions still need to be validated for checks, pins, can't capture king
 function getPawnMoves(row, col, pieceType) {
     var canMoveTwo = false;
     if (pawnOnStartingRow(row, pieceType)) {
@@ -121,9 +121,48 @@ function getPawnMoves(row, col, pieceType) {
     return moves;
 }
 
+function getRookMoves(row, col, pieceType) {
+    const moves = [];
+    // up, right, down, left
+    const directions = [
+        [-1, 0],
+        [0, 1],
+        [1, 0],
+        [0, -1],
+    ];
+
+    for (const [dx, dy] of directions) {
+        targetRow = row;
+        targetCol = col;
+        // go until out of bounds or blocked
+        while (isInBounds(targetRow + dx, targetCol + dy)) {
+            targetRow += dx;
+            targetCol += dy;
+            if (isEmptySquare(targetRow, targetCol)) {
+                moves.push([targetRow, targetCol]);
+            } else {
+                break;
+            }
+        }
+
+        // if blocked by enemy piece, can capture
+        if (
+            isInBounds(targetRow, targetCol) &&
+            isOppositeColour(pieceType, boardState[targetRow][targetCol])
+        ) {
+            moves.push([targetRow, targetCol]);
+        }
+    }
+
+    return moves;
+}
+
 function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
+    }
+    if (pieceType.toLowerCase() === "r") {
+        return getRookMoves(row, col, pieceType);
     }
 }
 
@@ -132,11 +171,12 @@ function handlePieceClick(event) {
     const square = parent.parentElement.id;
     const pieceType = pieceFromCoordinate(square);
     console.log(`Piece ${pieceType} clicked at square ${square}`);
-    const moves = getPossibleMoves(...fromCoordinate(square), pieceType)
+    const moves = getPossibleMoves(...fromCoordinate(square), pieceType);
     console.log(convertMoves(moves));
 }
 
 function renderBoard(boardState) {
+    // clear board to prevent id duplication
     removeElementsByClass("piece-image");
 
     for (let row = 0; row < SIZE; row++) {

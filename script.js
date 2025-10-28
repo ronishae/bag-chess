@@ -200,7 +200,6 @@ function getSetDistanceMoves(row, col, directions, pieceType) {
 }
 
 function getKingMoves(row, col, pieceType) {
-    const moves = [];
     // all 8 directions
     const directions = [
         [-1, 0],
@@ -217,7 +216,6 @@ function getKingMoves(row, col, pieceType) {
 }
 
 function getKnightMoves(row, col, pieceType) {
-    const moves = [];
     // all 8 L-shapes
     const directions = [
         [-2, -1],
@@ -316,30 +314,30 @@ function renderBoard(boardState) {
 
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
+            if (boardState[row][col] === ".") continue;
             const square = document.getElementById(toCoordinate(row, col));
-            if (boardState[row][col] !== ".") {
-                const button = document.createElement("button");
-                button.classList.add("piece-button");
-                if (
-                    (isBlackPiece(boardState[row][col]) && turn === "B") ||
-                    (!isBlackPiece(boardState[row][col]) && turn === "W")
-                ) {
-                    button.addEventListener("click", handlePieceClick);
-                }
-                // TODO: disable / hide button and change cursor otherwise
-
-                const piece = document.createElement("img");
-                button.appendChild(piece);
-
-                piece.classList.add("piece-image");
-                const id = boardState[row][col];
-                if (id === id.toUpperCase()) {
-                    piece.src = `pieces/${id.toLowerCase()}.png`;
-                } else {
-                    piece.src = `pieces/b${id.toLowerCase()}.png`;
-                }
-                square.appendChild(button);
+            
+            const button = document.createElement("button");
+            button.classList.add("piece-button");
+            if (
+                (isBlackPiece(boardState[row][col]) && turn === "B") ||
+                (!isBlackPiece(boardState[row][col]) && turn === "W")
+            ) {
+                button.addEventListener("click", handlePieceClick);
             }
+            // TODO: disable / hide button and change cursor otherwise
+
+            const piece = document.createElement("img");
+            button.appendChild(piece);
+
+            piece.classList.add("piece-image");
+            const id = boardState[row][col];
+            if (id === id.toUpperCase()) {
+                piece.src = `pieces/${id.toLowerCase()}.png`;
+            } else {
+                piece.src = `pieces/b${id.toLowerCase()}.png`;
+            }
+            square.appendChild(button);
         }
     }
 }

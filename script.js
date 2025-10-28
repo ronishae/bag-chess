@@ -2,9 +2,9 @@ const SIZE = 8;
 const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["p", "p", "p", "p", "p", "p", "p", "p"],
-    [".", ".", ".", ".", ".", "Q", ".", "."],
-    [".", ".", ".", ".", ".", ".", "q", "."],
-    [".", ".", ".", "q", ".", ".", "Q", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", "P", ".", ".", "p", "."],
+    [".", ".", "p", "K", "N", "p", "k", "Q"],
     [".", ".", ".", ".", ".", ".", ".", "."],
     ["P", "P", "P", "P", "P", "P", "P", "P"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
@@ -199,6 +199,39 @@ function getQueenMoves(row, col, pieceType) {
     return [...rookMoves, ...bishopMoves];
 }
 
+function getKingMoves(row, col, pieceType) {
+    const moves = [];
+    // all 8 directions
+    const directions = [
+        [-1, 0],
+        [-1, 1],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+        [1, -1],
+        [0, -1],
+        [-1, -1],
+    ];
+
+    for (const [dx, dy] of directions) {
+        const targetRow = row + dx;
+        const targetCol = col + dy;
+        if (isInBounds(targetRow, targetCol)) {
+            if (
+                isEmptySquare(targetRow, targetCol) ||
+                isOppositeColour(
+                    pieceType,
+                    boardState[targetRow][targetCol]
+                )
+            ) {
+                moves.push([targetRow, targetCol]);
+            }
+        }
+    }
+
+    return moves;
+}
+
 function getPossibleMoves(row, col, pieceType) {
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
@@ -211,6 +244,9 @@ function getPossibleMoves(row, col, pieceType) {
     }
     if (pieceType.toLowerCase() === "q") {
         return getQueenMoves(row, col, pieceType);
+    }
+    if (pieceType.toLowerCase() === "k") { 
+        return getKingMoves(row, col, pieceType);
     }
 }
 

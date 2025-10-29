@@ -1,17 +1,18 @@
 const SIZE = 8;
 const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
-    ["p", "p", "p", "p", "p", "p", "p", "p"],
+    ["f", "p", "p", "p", "p", "p", "p", "f"],
     [".", ".", ".", ".", ".", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
-    ["P", "P", "P", "P", "P", "P", "P", "P"],
+    ["F", "P", "P", "P", "P", "P", "P", "F"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ];
 const boardState = INIT;
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
+    "f" : "flag",
     "p" : "pawn",
     "r" : "rook", 
     "n" : "knight",
@@ -94,6 +95,34 @@ function convertMoves(moves) {
 }
 
 // all the get move functions still need to be validated for checks, pins, can't capture king
+// TODO: still unsure on the exact moves I want
+// for now, a rook that can pass through all units but cannot capture or threaten king
+function getFlagMoves(row, col, pieceType) {
+    const directions = [
+        [-1, 0],
+        [0, 1],
+        [1, 0],
+        [0, -1],
+    ];
+
+    const moves = [];
+    for (const [dx, dy] of directions) {
+        var targetRow = row;
+        var targetCol = col;
+        // go until out of bounds or blocked
+        while (isInBounds(targetRow + dx, targetCol + dy)) {
+            targetRow += dx;
+            targetCol += dy;
+            if (isEmptySquare(boardState, targetRow, targetCol)) {
+                moves.push([targetRow, targetCol]);
+            }
+            // don't break if it is blocked, keep going
+        }
+        // no capture logic
+    }
+    return moves;
+}
+
 function getPawnMoves(row, col, pieceType) {
     var canMoveTwo = false;
     if (pawnOnStartingRow(row, pieceType)) {
@@ -253,6 +282,7 @@ function getPiecePositions(board, colour) {
     positions.b = [];
     positions.n = [];
     positions.p = [];
+    positions.f = [];
 
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -401,8 +431,11 @@ function isInCheck(board, colour) {
 function getPossibleMoves(row, col, pieceType) {
     var bag = whiteBag;
     if (turn === "B") bag = blackBag;
-    if (!bag.has(pieceType.toLowerCase())) return [];
+    if (pieceType.toLowerCase() !== "f" && !bag.has(pieceType.toLowerCase())) return [];
 
+    if (pieceType.toLowerCase() === "f") {
+        return getFlagMoves(row, col, pieceType);
+    }
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
     }

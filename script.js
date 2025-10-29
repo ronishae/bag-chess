@@ -10,6 +10,20 @@ const INIT = [
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ];
 const boardState = INIT;
+const pieceList = ["p", "r", "n", "b", "q", "k"];
+const MAPPING = {
+    "p" : "pawn",
+    "r" : "rook", 
+    "n" : "knight",
+    "b" : "bishop",
+    "q" : "queen",
+    "k" : "king"
+}
+// TODO
+// will need to be reset, will use new on them instead of adding in a loop... maybe should do that. can do that later
+var blackBag = new Set([...pieceList]);
+var whiteBag = new Set([...pieceList]);
+
 var turn = "W"; // 'W' for White's turn, 'B' for Black
 
 const board = document.getElementById("board");
@@ -231,6 +245,32 @@ function getKnightMoves(row, col, pieceType) {
     return getSetDistanceMoves(row, col, directions, pieceType);
 }
 
+function getPiecePositions(board, colour) {
+    const positions = {};
+    positions.k = [];
+    positions.q = [];
+    positions.r = [];
+    positions.b = [];
+    positions.n = [];
+    positions.p = [];
+
+    for (let row = 0; row < SIZE; row++) {
+        for (let col = 0; col < SIZE; col++) {
+            const piece = board[row][col];
+            if (piece === ".") continue;
+
+            const isMyPiece =
+                (colour === "W" && !isBlackPiece(piece)) ||
+                (colour === "B" && isBlackPiece(piece));
+            if (isMyPiece) {
+                positions[piece.toLowerCase()].push([row, col]);
+            }
+        }
+    }
+    return positions;
+}
+
+// refactor to use getPiecePositions?
 function locateKing(board, colour) {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -359,6 +399,10 @@ function isInCheck(board, colour) {
 }
 
 function getPossibleMoves(row, col, pieceType) {
+    var bag = whiteBag;
+    if (turn === "B") bag = blackBag;
+    if (!bag.has(pieceType.toLowerCase())) return [];
+
     if (pieceType.toLowerCase() === "p") {
         return getPawnMoves(row, col, pieceType);
     }
@@ -444,13 +488,78 @@ function detectCheckmate() {
     }
 }
 
+function bagHasNoMoves(bag) {
+    const positions = getPiecePositions(boardState, turn);
+    
+    // iterate through pieceTypes in the given bag (stores lowercase)
+    for (const pieceType of bag) {
+        // Find the actual piece character (uppercase for White, lowercase for Black)
+        const pieceChar = turn === "W" ? pieceType.toUpperCase() : pieceType.toLowerCase();
+
+        const piecesOfThisType = positions[pieceType];
+        if (!piecesOfThisType) continue;
+
+        for (const [row, col] of piecesOfThisType) {
+            // get all possible moves for the piece at this position
+            const possibleMoves = getPossibleMoves(row, col, pieceChar);
+            const legalMoves = getLegalMoves(row, col, pieceChar, possibleMoves);
+
+            if (legalMoves.length > 0) {
+                return false;
+            }
+        }
+
+    }
+    // return true if none of the pieces in the bag have moves to make (i.e. have to reset the bag)
+    return true;
+}
+
+function renderBags() {
+    for (const pieceType of pieceList) {
+        const whiteBagPiece = document.getElementById(`white-bag-${MAPPING[pieceType]}`);
+        if (whiteBag.has(pieceType)) {
+            whiteBagPiece.classList.remove("used-piece");
+        }
+        else {
+            whiteBagPiece.classList.add("used-piece");
+        }
+        const blackBagPiece = document.getElementById(`black-bag-${MAPPING[pieceType]}`);
+        if (blackBag.has(pieceType)) {
+            blackBagPiece.classList.remove("used-piece");
+        }
+        else {
+            blackBagPiece.classList.add("used-piece");
+        }
+    }
+}
+
 function makeMove(pieceType, startRow, startCol, event) {
     const parent = event.target.parentElement;
     const square = parent.id;
     const [row, col] = fromCoordinate(square);
     
     updateBoard(boardState, pieceType, startRow, startCol, row, col);
+    if (turn === "W") {
+        var bagToUse = whiteBag;
+    } else {
+        bagToUse = blackBag;
+    }
+    bagToUse.delete(pieceType.toLowerCase());
 
+    if (bagHasNoMoves(bagToUse)) {
+        // need to duplicate this check since JS can't dereference pointers to actually update the real bag
+        // using the bagToUse variable
+        if (turn === "W") {
+            whiteBag = new Set([...pieceList]);
+        }
+        else {
+            blackBag = new Set([...pieceList]);
+        }
+        console.log('Reset Bag!');
+    }
+
+    renderBags();
+    
     if (turn === "W") {
         turn = "B";
     } else {

@@ -28,8 +28,65 @@
         </div>
     </div>
 
-    <div>
-        <p>Hello!</p>
+    <div id="rules">
+        <h1>Bag Chess Rules</h1>
+        <p>Rules are the same to normal chess with 2 main changes.</p>
+        <h2>1. You can only move pieces that are in your "move bag"</h2>
+        <p>
+            It initially starts with every normal* (see change 2) piece. 
+            When that piece moves, it is taken out of the move bag.
+        </p>
+        <p>
+            When the move bag is empty, or contains only pieces with no legal
+            moves, then the move bag is refilled again. 
+        </p>
+        <p>
+            Move bags are displayed on each player's side of the chess board.
+        </p>
+        
+        <h2>2. New piece: the flag bearer</h2>
+        <p>
+            It looks like a pawn with a flag.
+            Each player has two, replacing the pawns in front of each rook.
+        </p>
+        <p>
+            It moves like a rook, except it can <b>pass through friendly</b> pieces, and
+            it <b>cannot capture or give check/checkmate</b>.
+        </p>
+
+        <p>
+            The flag bearer is exempt from the bag rule, and can be moved regardless of the bag's state.
+        </p>
+        
+        <h3>
+            The flag bearer will move a passenger with it when it moves.
+        </h3>
+
+        <p>
+            The passenger is the friendly piece immediately behind (opposite to the direction of movement) the flag bearer.
+        </p>
+
+        <p>
+            The passenger cannot be a pawn. 
+        </p>
+
+        <p>
+            If the passenger is a king, even if the squares in between are
+            attacked, the move is still legal, as long as the king's ending square is not attacked.
+        </p>
+
+        <p>
+            If there is no space for the passenger at the destination, or there is no passenger, 
+            the flag bearer will move alone.
+        </p>
+
+        <h2>Clarifications</h2>
+        <p>
+            Even if a piece cannot move because it is not in the move bag, it is still able to give check / checkmate.
+        </p>
+        <p>
+            The flag bearer may bring passengers with it even when travelling through pieces.
+        </p>
     </div>
     
 </body>

@@ -1,3 +1,29 @@
+body {
+    display: flex;
+    font-family: Verdana, Geneva, Tahoma, sans-serif
+}
+
+#game-container {
+    margin: 5px;
+}
+
+#rules {
+    margin: 5px;
+}
+
+h1 {
+    margin-top: 20px;
+    font-size: 20px;
+}
+
+h2 {
+    font-size: 17px;
+}
+
+p {
+    font-size: 15px;
+}
+
 #board {
     width: 400px;
     height: 400px;

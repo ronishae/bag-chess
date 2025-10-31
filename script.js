@@ -587,18 +587,31 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
             // remove the duplicate king just for safety, but it shouldn't change whether it is in check or not
             hypotheticalBoard[startRow][startCol] = ".";
 
-            if (isInCheck(hypotheticalBoard, turn)) {
+            if (isInCheck(hypotheticalBoard, turn)) return false;
+        }
+        
+        if (pieceType.toLowerCase() === "f") {
+            const hypotheticalBoard2 = structuredClone(boardState);
+            
+            // need to move the flag piece before trying to move the passenger, in case the 
+            // passenger is moving into the flag piece's old spot
+            updateBoard(hypotheticalBoard2, pieceType, startRow, startCol, row, col);
+            tryMoveFlagPassenger(hypotheticalBoard2, pieceType, startRow, startCol, row, col);
+ 
+            if (isInCheck(hypotheticalBoard2, turn)) {
                 return false;
             }
         }
-        
-        // this should be checked even if castling, since you can't end in check after castling
-        const hypotheticalBoard2 = structuredClone(boardState);
-        updateBoard(hypotheticalBoard2, pieceType, startRow, startCol, row, col);
-        if (isInCheck(hypotheticalBoard2, turn)) {
-            return false;
+        else {
+            // this should be checked even if castling, since you can't end in check after castling
+            // but should be handled separately to flag move, because this only checks moving the piece in question
+            // whereas flag has a separate logic check that would move a passenger
+            // this would then only move the flag piece, potentially leaving the king behind, causing it to
+            // think the king is still in check
+            const hypotheticalBoard3 = structuredClone(boardState);
+            updateBoard(hypotheticalBoard3, pieceType, startRow, startCol, row, col);
+            if (isInCheck(hypotheticalBoard3, turn)) return false;
         }
-        
             
         return true;
     });
@@ -706,14 +719,8 @@ function renderBags() {
     }
 }
 
-function makeMove(pieceType, startRow, startCol, event) {
-    const parent = event.target.parentElement;
-    const startingSquare = toCoordinate(startRow, startCol);
-    const square = parent.id;
-    const [endRow, endCol] = fromCoordinate(square);
 
-    // update castling state
-
+function updateCastlingStateAfterMove(pieceType, startingSquare, endingSquare) {
     // one of the involved pieces moves
     if (pieceType === "K") {
         whiteKingSidePossible = false;
@@ -724,14 +731,12 @@ function makeMove(pieceType, startRow, startCol, event) {
     } else if (pieceType === "R") {
         if (startingSquare === "a1") {
             whiteQueenSidePossible = false;
-            console.log("white queenside false because queenside rook moved");
         } else if (startingSquare === "h1") {
             whiteKingSidePossible = false;
         }
     } else if (pieceType === "r") {
         if (startingSquare === "a8") {
             blackQueenSidePossible = false;
-            console.log("black queenside false because queenside rook moved");
         } else if (startingSquare === "h8") {
             blackKingSidePossible = false;
         }
@@ -739,17 +744,63 @@ function makeMove(pieceType, startRow, startCol, event) {
 
     // square is the ending location, so if it ends on one of the rook locations
     // the rook must have been captured
-    if (square === "a1") {
+    if (endingSquare === "a1") {
         whiteQueenSidePossible = false;
-    } else if (square === "h1") {
+    } else if (endingSquare === "h1") {
         whiteKingSidePossible = false;
-    } else if (square === "a8") {
+    } else if (endingSquare === "a8") {
         blackQueenSidePossible = false;
-    } else if (square === "h8") {
+    } else if (endingSquare === "h8") {
         blackKingSidePossible = false;
     }
+}
 
+// passengerSquare is in the opposite direction of movement
+function getFlagPassengerDirection(startRow, startCol, endRow, endCol) {
+    var passengerDirection = [0, 0];
+    if (startRow < endRow) passengerDirection = [-1, 0];
+    else if (startRow > endRow) passengerDirection = [1, 0];
+    else if (startCol < endCol) passengerDirection = [0, -1];
+    else if (startCol > endCol) passengerDirection = [0, 1];
+
+    return passengerDirection
+}
+
+function getFlagPassengerSquare(startRow, startCol, passengerDirection) {
+    return [startRow + passengerDirection[0], startCol + passengerDirection[1]];
+}
+
+// Cannot move pawns.
+// this might move a king into check or cause a check state, so flag moves should be validated first
+function tryMoveFlagPassenger(board, pieceType, startRow, startCol, endRow, endCol) {
+    const passengerDirection = getFlagPassengerDirection(startRow, startCol, endRow, endCol);   
+    const passengerSquare = getFlagPassengerSquare(startRow, startCol, passengerDirection);
+    // move passenger
+    if (isInBounds(...passengerSquare)) {
+        var passengerPiece = board[passengerSquare[0]][passengerSquare[1]];
+        const passengerTargetSquare = [endRow + passengerDirection[0], endCol + passengerDirection[1]];
+        if (isEmptySquare(board, ...passengerTargetSquare) 
+            && isSameColour(pieceType, passengerPiece) 
+            && passengerPiece.toLowerCase() !== "p") {
+            updateBoard(board, passengerPiece, ...passengerSquare, ...passengerTargetSquare);
+        }
+    }
+}
+
+function makeMove(pieceType, startRow, startCol, event) {
+    const parent = event.target.parentElement;
+    const startingSquare = toCoordinate(startRow, startCol);
+    const endingSquare = parent.id;
+    const [endRow, endCol] = fromCoordinate(endingSquare);
+
+    updateCastlingStateAfterMove(pieceType, startingSquare, endingSquare);
+    
     updateBoard(boardState, pieceType, startRow, startCol, endRow, endCol);
+    // handle flag move specifically
+    // move passenger after moving the piece so it is allowed to move into the flag piece's old spot
+    if (pieceType.toLowerCase() === "f") {
+        tryMoveFlagPassenger(boardState, pieceType, startRow, startCol, endRow, endCol);
+    }
 
     if (turn === "W") {
         var bagToUse = whiteBag;

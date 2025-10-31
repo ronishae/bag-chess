@@ -44,6 +44,10 @@ p {
     margin-bottom: 20px;
 }
 
+.green-background {
+    background-color: #a0f7ac;
+}
+
 .used-piece {
     opacity: 0.5;
 }

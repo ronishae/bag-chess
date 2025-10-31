@@ -808,8 +808,12 @@ function makeMove(pieceType, startRow, startCol, event) {
 
     if (turn === "W") {
         var bagToUse = whiteBag;
+        var bagToUnhighlight = document.getElementById("white-bag");
+        var bagToHighlight = document.getElementById("black-bag");
     } else {
         bagToUse = blackBag;
+        var bagToUnhighlight = document.getElementById("black-bag");
+        var bagToHighlight = document.getElementById("white-bag");
     }
     bagToUse.delete(pieceType.toLowerCase());
 
@@ -825,6 +829,8 @@ function makeMove(pieceType, startRow, startCol, event) {
     }
 
     renderBags();
+    bagToHighlight.classList.add("green-background");
+    bagToUnhighlight.classList.remove("green-background");
 
     if (turn === "W") {
         turn = "B";

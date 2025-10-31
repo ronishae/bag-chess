@@ -525,7 +525,6 @@ function updateBoard(
     const KINGSIDEROOK = 7;
     // this is a castle since king moves 2 squares, need to additionally move the rook
     if (pieceType.toLowerCase() === "k" && Math.abs(startCol - targetCol) == 2) {
-        // TODO, check which castle we are making, so we know which rook to move.
         if (targetCoordinate === "c1") {
             board[WHITEROW][QUEENSIDEROOK] = ".";
             board[WHITEROW][QUEENSIDE] = "R";
@@ -552,14 +551,58 @@ function updateBoard(
 function getLegalMoves(startRow, startCol, pieceType, moves) {
     // for a move to be legal, your king cannot be in check next turn
     // (whether or not you were put in check, or if the move is putting yourself in check)
-    return moves.filter(([row, col]) => {
-        const hypotheticalBoard = structuredClone(boardState);
-        updateBoard(hypotheticalBoard, pieceType, startRow, startCol, row, col);
-        if (isInCheck(hypotheticalBoard, turn)) {
+    
+    const WHITEROW = 7;
+    const BLACKROW = 0;
+    const QUEENCROSS = 3;
+    const KINGCROSS = 5;
+    const filtered = moves.filter(([row, col]) => {
+        // castling case
+        if (pieceType.toLowerCase() === "k" && Math.abs(startCol - col) == 2) {
+            // can't castle while in check
+            if (isInCheck(boardState, turn)) {
+                return false;
+            }
+
+            const targetCoordinate = toCoordinate(row, col);
+            const hypotheticalBoard = structuredClone(boardState);
+            
+            // check if the crossing square is attacked
+            // queenside white
+            if (targetCoordinate === "c1") {
+                hypotheticalBoard[WHITEROW][QUEENCROSS] = "K";
+            }
+            // kingside white
+            else if (targetCoordinate === "g1") {
+                hypotheticalBoard[WHITEROW][KINGCROSS] = "K";
+            }
+            // queenside black
+            else if (targetCoordinate === "c8") {
+                hypotheticalBoard[BLACKROW][QUEENCROSS] = "k";
+            }
+            // king side black
+            else if (targetCoordinate === "g8") {
+                hypotheticalBoard[BLACKROW][KINGCROSS] = 'k';
+            }
+            // remove the duplicate king just for safety, but it shouldn't change whether it is in check or not
+            hypotheticalBoard[startRow][startCol] = ".";
+
+            if (isInCheck(hypotheticalBoard, turn)) {
+                return false;
+            }
+        }
+        
+        // this should be checked even if castling, since you can't end in check after castling
+        const hypotheticalBoard2 = structuredClone(boardState);
+        updateBoard(hypotheticalBoard2, pieceType, startRow, startCol, row, col);
+        if (isInCheck(hypotheticalBoard2, turn)) {
             return false;
         }
+        
+            
         return true;
     });
+    return filtered;
 }
 
 function detectCheckmate() {

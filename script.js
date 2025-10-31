@@ -128,6 +128,10 @@ function getFlagMoves(row, col, pieceType) {
             if (isEmptySquare(boardState, targetRow, targetCol)) {
                 moves.push([targetRow, targetCol]);
             }
+            // cannot pass through enemy pieces
+            else if (isOppositeColour(pieceType, boardState[targetRow][targetCol])) {
+                break;
+            }
             // don't break if it is blocked, keep going
         }
         // no capture logic

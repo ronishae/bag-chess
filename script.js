@@ -12,20 +12,32 @@ const INIT = [
 const boardState = INIT;
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
-    "f" : "flag",
-    "p" : "pawn",
-    "r" : "rook", 
-    "n" : "knight",
-    "b" : "bishop",
-    "q" : "queen",
-    "k" : "king"
-}
+    f: "flag",
+    p: "pawn",
+    r: "rook",
+    n: "knight",
+    b: "bishop",
+    q: "queen",
+    k: "king",
+};
 // TODO
 // will need to be reset, will use new on them instead of adding in a loop... maybe should do that. can do that later
 var blackBag = new Set([...pieceList]);
 var whiteBag = new Set([...pieceList]);
 
 var turn = "W"; // 'W' for White's turn, 'B' for Black
+
+// if a king moves, both sides not possible. If a rook moves, that respective side is not possible
+// this just is whether it is theoretically possible.
+// still need to check for:
+// empty space
+// not castling through check
+// or into check
+// or while in check
+var blackQueenSidePossible = true;
+var blackKingSidePossible = true;
+var whiteQueenSidePossible = true;
+var whiteKingSidePossible = true;
 
 const board = document.getElementById("board");
 function toLetter(num) {
@@ -142,7 +154,11 @@ function getPawnMoves(row, col, pieceType) {
 
         // only check two-square move if one-square move is valid
         const target2 = [row + 2 * direction, col];
-        if (canMoveTwo && isInBounds(...target2) && isEmptySquare(boardState, ...target2)) {
+        if (
+            canMoveTwo &&
+            isInBounds(...target2) &&
+            isEmptySquare(boardState, ...target2)
+        ) {
             moves.push(target2);
         }
     }
@@ -242,6 +258,26 @@ function getSetDistanceMoves(row, col, directions, pieceType) {
     return moves;
 }
 
+// validates if we have rights and space to castle, but need to validate checks
+function hasSpaceToQueensideCastle(castlingRights, row, col) {
+    if (
+        castlingRights &&
+        isEmptySquare(boardState, row, col - 1) &&
+        isEmptySquare(boardState, row, col - 2) &&
+        isEmptySquare(boardState, row, col - 3)
+    ) return true;
+    return false;
+}
+
+function hasSpaceToKingsideCastle(castlingRights, row, col) {
+    if (
+        castlingRights &&
+        isEmptySquare(boardState, row, col + 1) &&
+        isEmptySquare(boardState, row, col + 2)
+    ) return true;
+    return false;
+}
+
 function getKingMoves(row, col, pieceType) {
     // all 8 directions
     const directions = [
@@ -254,8 +290,17 @@ function getKingMoves(row, col, pieceType) {
         [0, -1],
         [-1, -1],
     ];
-
-    return getSetDistanceMoves(row, col, directions, pieceType);
+    const moves = getSetDistanceMoves(row, col, directions, pieceType);
+    // white queenside
+    if (turn === "W") {
+        if (hasSpaceToQueensideCastle(whiteQueenSidePossible, row, col)) moves.push([row, col - 2]);
+        if (hasSpaceToKingsideCastle(whiteKingSidePossible, row, col)) moves.push([row, col + 2]);
+    }
+    else {
+        if (hasSpaceToQueensideCastle(blackQueenSidePossible, row, col)) moves.push([row, col - 2]);
+        if (hasSpaceToKingsideCastle(blackKingSidePossible, row, col)) moves.push([row, col + 2]);
+    }
+    return moves;
 }
 
 function getKnightMoves(row, col, pieceType) {
@@ -396,7 +441,7 @@ function isInCheck(board, colour) {
                 ["r", "q"].includes(attacker.toLowerCase())
             ) {
                 return true;
-            // blocked, stop checking this direction
+                // blocked, stop checking this direction
             } else if (!isEmptySquare(board, targetRow, targetCol)) {
                 break;
             }
@@ -417,7 +462,7 @@ function isInCheck(board, colour) {
                 ["b", "q"].includes(attacker.toLowerCase())
             ) {
                 return true;
-            // blocked, stop checking this direction
+                // blocked, stop checking this direction
             } else if (!isEmptySquare(board, targetRow, targetCol)) {
                 break;
             }
@@ -431,7 +476,8 @@ function isInCheck(board, colour) {
 function getPossibleMoves(row, col, pieceType) {
     var bag = whiteBag;
     if (turn === "B") bag = blackBag;
-    if (pieceType.toLowerCase() !== "f" && !bag.has(pieceType.toLowerCase())) return [];
+    if (pieceType.toLowerCase() !== "f" && !bag.has(pieceType.toLowerCase()))
+        return [];
 
     if (pieceType.toLowerCase() === "f") {
         return getFlagMoves(row, col, pieceType);
@@ -458,12 +504,51 @@ function getPossibleMoves(row, col, pieceType) {
     return [];
 }
 
-function updateBoard(board, pieceType, startRow, startCol, targetRow, targetCol) {
+
+function updateBoard(
+    board,
+    pieceType,
+    startRow,
+    startCol,
+    targetRow,
+    targetCol
+) {
     board[startRow][startCol] = ".";
     board[targetRow][targetCol] = pieceType;
+
+    const targetCoordinate = toCoordinate(targetRow, targetCol);
+    const WHITEROW = 7;
+    const BLACKROW = 0;
+    const QUEENSIDE = 3;
+    const KINGSIDE = 5;
+    const QUEENSIDEROOK = 0;
+    const KINGSIDEROOK = 7;
+    // this is a castle since king moves 2 squares, need to additionally move the rook
+    if (pieceType.toLowerCase() === "k" && Math.abs(startCol - targetCol) == 2) {
+        // TODO, check which castle we are making, so we know which rook to move.
+        if (targetCoordinate === "c1") {
+            board[WHITEROW][QUEENSIDEROOK] = ".";
+            board[WHITEROW][QUEENSIDE] = "R";
+        }
+        else if (targetCoordinate === "g1") {
+            board[WHITEROW][KINGSIDEROOK] = ".";
+            board[WHITEROW][KINGSIDE] = "R";
+        }
+        else if (targetCoordinate === "c8") {
+            board[BLACKROW][QUEENSIDEROOK] = ".";
+            board[BLACKROW][QUEENSIDE] = "r";
+        }
+        else if (targetCoordinate === "g8") {
+            board[BLACKROW][KINGSIDEROOK] = ".";
+            board[BLACKROW][KINGSIDE] = "r";
+        }
+    }
+    
 }
 
 // will need to handle castling specifically later
+// if the moved piece is a king, and the distance it moves is 2, then it must be castling
+// then can check all the spots along the castle operation to check if valid, and if it is in check
 function getLegalMoves(startRow, startCol, pieceType, moves) {
     // for a move to be legal, your king cannot be in check next turn
     // (whether or not you were put in check, or if the move is putting yourself in check)
@@ -500,7 +585,12 @@ function detectCheckmate() {
                 const possibleMoves = getPossibleMoves(row, col, pieceType);
 
                 // find moves that do not leave king in check
-                const legalMoves = getLegalMoves(row, col, pieceType, possibleMoves);
+                const legalMoves = getLegalMoves(
+                    row,
+                    col,
+                    pieceType,
+                    possibleMoves
+                );
 
                 // not checkmate if any legal move exists
                 if (legalMoves.length > 0) {
@@ -523,11 +613,12 @@ function detectCheckmate() {
 
 function bagHasNoMoves(bag) {
     const positions = getPiecePositions(boardState, turn);
-    
+
     // iterate through pieceTypes in the given bag (stores lowercase)
     for (const pieceType of bag) {
         // Find the actual piece character (uppercase for White, lowercase for Black)
-        const pieceChar = turn === "W" ? pieceType.toUpperCase() : pieceType.toLowerCase();
+        const pieceChar =
+            turn === "W" ? pieceType.toUpperCase() : pieceType.toLowerCase();
 
         const piecesOfThisType = positions[pieceType];
         if (!piecesOfThisType) continue;
@@ -535,13 +626,17 @@ function bagHasNoMoves(bag) {
         for (const [row, col] of piecesOfThisType) {
             // get all possible moves for the piece at this position
             const possibleMoves = getPossibleMoves(row, col, pieceChar);
-            const legalMoves = getLegalMoves(row, col, pieceChar, possibleMoves);
+            const legalMoves = getLegalMoves(
+                row,
+                col,
+                pieceChar,
+                possibleMoves
+            );
 
             if (legalMoves.length > 0) {
                 return false;
             }
         }
-
     }
     // return true if none of the pieces in the bag have moves to make (i.e. have to reset the bag)
     return true;
@@ -549,18 +644,20 @@ function bagHasNoMoves(bag) {
 
 function renderBags() {
     for (const pieceType of pieceList) {
-        const whiteBagPiece = document.getElementById(`white-bag-${MAPPING[pieceType]}`);
+        const whiteBagPiece = document.getElementById(
+            `white-bag-${MAPPING[pieceType]}`
+        );
         if (whiteBag.has(pieceType)) {
             whiteBagPiece.classList.remove("used-piece");
-        }
-        else {
+        } else {
             whiteBagPiece.classList.add("used-piece");
         }
-        const blackBagPiece = document.getElementById(`black-bag-${MAPPING[pieceType]}`);
+        const blackBagPiece = document.getElementById(
+            `black-bag-${MAPPING[pieceType]}`
+        );
         if (blackBag.has(pieceType)) {
             blackBagPiece.classList.remove("used-piece");
-        }
-        else {
+        } else {
             blackBagPiece.classList.add("used-piece");
         }
     }
@@ -568,10 +665,49 @@ function renderBags() {
 
 function makeMove(pieceType, startRow, startCol, event) {
     const parent = event.target.parentElement;
+    const startingSquare = toCoordinate(startRow, startCol);
     const square = parent.id;
-    const [row, col] = fromCoordinate(square);
-    
-    updateBoard(boardState, pieceType, startRow, startCol, row, col);
+    const [endRow, endCol] = fromCoordinate(square);
+
+    // update castling state
+
+    // one of the involved pieces moves
+    if (pieceType === "K") {
+        whiteKingSidePossible = false;
+        whiteQueenSidePossible = false;
+    } else if (pieceType === "k") {
+        blackKingSidePossible = false;
+        blackQueenSidePossible;
+    } else if (pieceType === "R") {
+        if (startingSquare === "a1") {
+            whiteQueenSidePossible = false;
+            console.log("white queenside false because queenside rook moved");
+        } else if (startingSquare === "h1") {
+            whiteKingSidePossible = false;
+        }
+    } else if (pieceType === "r") {
+        if (startingSquare === "a8") {
+            blackQueenSidePossible = false;
+            console.log("black queenside false because queenside rook moved");
+        } else if (startingSquare === "h8") {
+            blackKingSidePossible = false;
+        }
+    }
+
+    // square is the ending location, so if it ends on one of the rook locations
+    // the rook must have been captured
+    if (square === "a1") {
+        whiteQueenSidePossible = false;
+    } else if (square === "h1") {
+        whiteKingSidePossible = false;
+    } else if (square === "a8") {
+        blackQueenSidePossible = false;
+    } else if (square === "h8") {
+        blackKingSidePossible = false;
+    }
+
+    updateBoard(boardState, pieceType, startRow, startCol, endRow, endCol);
+
     if (turn === "W") {
         var bagToUse = whiteBag;
     } else {
@@ -584,15 +720,14 @@ function makeMove(pieceType, startRow, startCol, event) {
         // using the bagToUse variable
         if (turn === "W") {
             whiteBag = new Set([...pieceList]);
-        }
-        else {
+        } else {
             blackBag = new Set([...pieceList]);
         }
-        console.log('Reset Bag!');
+        console.log("Reset Bag!");
     }
 
     renderBags();
-    
+
     if (turn === "W") {
         turn = "B";
     } else {
@@ -606,7 +741,7 @@ function makeMove(pieceType, startRow, startCol, event) {
 }
 
 function clearIndicators() {
-    removeElementsByClass("check-indicator")
+    removeElementsByClass("check-indicator");
     removeElementsByClass("move-indicator");
     removeElementsByClass("capture-indicator");
 }
@@ -640,22 +775,28 @@ function handlePieceClick(event) {
     const square = parent.parentElement.id;
     const pieceType = pieceFromCoordinate(square);
 
-    const moves = getLegalMoves(...fromCoordinate(square), pieceType, getPossibleMoves(...fromCoordinate(square), pieceType));
+    const moves = getLegalMoves(
+        ...fromCoordinate(square),
+        pieceType,
+        getPossibleMoves(...fromCoordinate(square), pieceType)
+    );
     renderMoves(pieceType, ...fromCoordinate(square), convertMoves(moves));
 }
 
 function renderBoard(board, check, checkedRow, checkedCol) {
     // clear board to prevent id duplication
     removeElementsByClass("piece-image");
+    removeElementsByClass("piece-button");
 
+    var pieceId = 1;
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             if (board[row][col] === ".") continue;
             const square = document.getElementById(toCoordinate(row, col));
-            
+
             // each piece is a button
             const button = document.createElement("button");
-            
+
             // activate button and attach handler
             button.classList.add("piece-button");
             if (
@@ -678,11 +819,11 @@ function renderBoard(board, check, checkedRow, checkedCol) {
             const piece = document.createElement("img");
             button.appendChild(piece);
             piece.classList.add("piece-image");
-            const id = board[row][col];
-            if (id === id.toUpperCase()) {
-                piece.src = `pieces/${id.toLowerCase()}.png`;
+            const pieceType = board[row][col];
+            if (pieceType === pieceType.toUpperCase()) {
+                piece.src = `pieces/${pieceType.toLowerCase()}.png`;
             } else {
-                piece.src = `pieces/b${id.toLowerCase()}.png`;
+                piece.src = `pieces/b${pieceType.toLowerCase()}.png`;
             }
 
             // put button in square

@@ -892,7 +892,6 @@ function renderBoard(board, check, checkedRow, checkedCol) {
     removeElementsByClass("piece-image");
     removeElementsByClass("piece-button");
 
-    var pieceId = 1;
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             if (board[row][col] === ".") continue;

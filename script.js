@@ -631,12 +631,8 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
     return filtered;
 }
 
-function detectCheckmate() {
+function detectEndOfGame() {
     const inCheck = isInCheck(boardState, turn);
-    // must be in check to be checkmate
-    if (!inCheck) {
-        return;
-    }
 
     // iterate through all pieces of the current player and look for legal moves.
     let legalMoveExists = false;
@@ -673,10 +669,18 @@ function detectCheckmate() {
         }
     }
 
+
+    // TODO: disable buttons and implement end of game
+
     // checkmate
-    if (!legalMoveExists) {
+    // must be in check to be checkmate
+    if (!legalMoveExists && inCheck) {
         console.log("Checkmate! Game Over.");
-        // TODO: disable buttons and implement end of game
+    }
+        
+    else if (!legalMoveExists) {
+        // need to test stalemate later
+        console.log("Stalemate! Game Over");
     }
 }
 
@@ -850,7 +854,7 @@ function makeMove(pieceType, startRow, startCol, event) {
     const [kingRow, kingCol] = locateKing(boardState, turn);
     clearIndicators();
     renderBoard(boardState, inCheck, kingRow, kingCol);
-    detectCheckmate();
+    detectEndOfGame();
 }
 
 function clearIndicators() {

@@ -852,7 +852,8 @@ function makeMove(pieceType, startRow, startCol, event) {
 }
 
 function clearIndicators() {
-    removeElementsByClass("check-indicator");
+    // don't clear check-indicators, they will be removed when board is re-rendered
+    // we want them to stay until the move is made
     removeElementsByClass("move-indicator");
     removeElementsByClass("capture-indicator");
 }

@@ -526,16 +526,25 @@ function updateBoard(
     targetRow,
     targetCol
 ) {
-    board[startRow][startCol] = ".";
-    board[targetRow][targetCol] = pieceType;
-
-    const targetCoordinate = toCoordinate(targetRow, targetCol);
     const WHITEROW = 7;
     const BLACKROW = 0;
     const QUEENSIDE = 3;
     const KINGSIDE = 5;
     const QUEENSIDEROOK = 0;
     const KINGSIDEROOK = 7;
+
+    board[startRow][startCol] = ".";
+    
+    // handle promotion -- auto queen
+    // since pawns can't move backwards, just using the target row is sufficient to determine the colour
+    if (pieceType.toLowerCase() === "p" && targetRow === BLACKROW) board[targetRow][targetCol] = "Q";
+    else if (pieceType.toLowerCase() === "p" && targetRow === WHITEROW) board[targetRow][targetCol] = "q";
+    else {
+        board[targetRow][targetCol] = pieceType;
+    }
+
+    const targetCoordinate = toCoordinate(targetRow, targetCol);
+    
     // this is a castle since king moves 2 squares, need to additionally move the rook
     if (pieceType.toLowerCase() === "k" && Math.abs(startCol - targetCol) == 2) {
         if (targetCoordinate === "c1") {

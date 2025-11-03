@@ -89,6 +89,9 @@ p {
     font-size: 15px;
     text-transform: uppercase;
     opacity: 0.6;
+
+    /* want the square to always be the one handling the click */
+    pointer-events: none;
 }
 
 /* if they are not the full square size, user can click behind them on elements I don't expect to be */

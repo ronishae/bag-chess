@@ -46,6 +46,8 @@ var blackKingSidePossible = true;
 var whiteQueenSidePossible = true;
 var whiteKingSidePossible = true;
 
+var lastClickedPieceLocation = null;
+
 const board = document.getElementById("board");
 function toLetter(num) {
     return String.fromCharCode("a".charCodeAt(0) + num);
@@ -882,9 +884,26 @@ function renderMoves(pieceType, startRow, startCol, moves) {
     }
 }
 
+// if a user clicks a blank square, assume they want to hide the move indicators
+function handleSquareClick(event) {
+    if (event.target.classList.contains("square")) {
+        clearIndicators();
+    }
+}
+
 function handlePieceClick(event) {
     const parent = event.target.parentElement;
     const square = parent.parentElement.id;
+
+    // if we click the same piee again, assume user wants to hide the move indicators again
+    if (lastClickedPieceLocation === square) {
+        clearIndicators();
+        // reset back to null, so the next time the user clicks, it will be as if it is the first time
+        lastClickedPieceLocation = null;
+        return;
+    }
+    lastClickedPieceLocation = square;
+
     const pieceType = pieceFromCoordinate(square);
 
     const moves = getLegalMoves(
@@ -1012,6 +1031,7 @@ function init() {
             square.appendChild(coordinateLabel);
             square.classList.add("square");
             
+            square.addEventListener("click", handleSquareClick);
             // squares need these drop listners to enable piece dragging for moving
             square.addEventListener("dragover", handleDragOver);
             square.addEventListener("drop", handleDrop);

@@ -920,6 +920,10 @@ function handleDrop(event) {
     event.preventDefault();
 
     const startSquare = event.dataTransfer.getData(DRAG_DATA_KEY);
+    // happens if dragging a piece different than the current turn, since it is not set
+    // this prevents errors in the webconsole when that happens
+    if (!startSquare) return;
+
     const endSquareElement = event.currentTarget;
     const endSquare = endSquareElement.id;
 

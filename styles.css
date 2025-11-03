@@ -4,6 +4,7 @@ body {
 }
 
 #game-container {
+    user-select: none;
     margin: 5px;
 }
 

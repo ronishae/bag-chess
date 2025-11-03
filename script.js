@@ -27,6 +27,13 @@ var whiteBag = new Set([...pieceList]);
 
 var turn = "W"; // 'W' for White's turn, 'B' for Black
 
+// for implenetation of dragging pieces to move them
+// is used in event.dataTransfer
+// specific MIME format keys are stored in the browsers can be set and get from
+// using event.dataTransfer.getData or setData
+// we will just be using plain text
+const DRAG_DATA_KEY = "text/plain"; 
+
 // if a king moves, both sides not possible. If a rook moves, that respective side is not possible
 // this just is whether it is theoretically possible.
 // still need to check for:
@@ -887,6 +894,56 @@ function handlePieceClick(event) {
     renderMoves(pieceType, ...fromCoordinate(square), convertMoves(moves));
 }
 
+function handleDragStart(event) {
+    const startSquare = event.currentTarget.parentElement.id;
+    const [startRow, startCol] = fromCoordinate(startSquare);
+    const pieceType = pieceFromCoordinate(startSquare);
+
+    event.dataTransfer.setData(DRAG_DATA_KEY, startSquare);
+    // specifically allow move option. Still works without it, but good for robustness
+    event.dataTransfer.effectAllowed = "move"; 
+
+    // to show move indicators on drag as well
+    const possibleMoves = getPossibleMoves(startRow, startCol, pieceType);
+    const legalMoves = getLegalMoves(startRow, startCol, pieceType, possibleMoves);
+    renderMoves(pieceType, startRow, startCol, convertMoves(legalMoves));
+}
+
+function handleDragOver(event) {
+    event.preventDefault(); // need this to allow dropping (by default, it is prevented)
+    // Works in combination with the line in handleDragStart
+    // technically removable, but good for robustness apparently
+    event.dataTransfer.dropEffect = "move";
+}
+
+function handleDrop(event) {
+    event.preventDefault();
+
+    const startSquare = event.dataTransfer.getData(DRAG_DATA_KEY);
+    const endSquareElement = event.currentTarget;
+    const endSquare = endSquareElement.id;
+
+    const [startRow, startCol] = fromCoordinate(startSquare);
+    const pieceType = pieceFromCoordinate(startSquare);
+    const [endRow, endCol] = fromCoordinate(endSquare);
+    
+    // check if the drop location is a legal move
+    // this could technically be removed, but this validation
+    // prevents errors when calling the function that would appear in the web console
+    const possibleMoves = getPossibleMoves(startRow, startCol, pieceType);
+    const legalMoves = getLegalMoves(startRow, startCol, pieceType, possibleMoves);
+    const isLegalDrop = legalMoves.some(([r, c]) => r === endRow && c === endCol);
+    
+    if (isLegalDrop) {
+        // construct a fake event object to pass to makeMove
+        // give it the target it would receive if that button was clicked
+        const fakeEvent = {
+            target: endSquareElement.querySelector('.move-button')
+        };
+        makeMove(pieceType, startRow, startCol, fakeEvent);
+    }
+}
+
 function renderBoard(board, check, checkedRow, checkedCol) {
     // clear board to prevent id duplication
     removeElementsByClass("piece-image");
@@ -907,6 +964,7 @@ function renderBoard(board, check, checkedRow, checkedCol) {
                 (!isBlackPiece(board[row][col]) && turn === "W")
             ) {
                 button.addEventListener("click", handlePieceClick);
+                button.addEventListener("dragstart", handleDragStart);
             }
             // TODO: disable / hide button and change cursor otherwise
 
@@ -922,6 +980,8 @@ function renderBoard(board, check, checkedRow, checkedCol) {
             const piece = document.createElement("img");
             button.appendChild(piece);
             piece.classList.add("piece-image");
+            piece.draggable = true; 
+            
             const pieceType = board[row][col];
             if (pieceType === pieceType.toUpperCase()) {
                 piece.src = `pieces/${pieceType.toLowerCase()}.png`;
@@ -946,6 +1006,10 @@ function init() {
             coordinateLabel.classList.add("coord-label");
             square.appendChild(coordinateLabel);
             square.classList.add("square");
+            
+            // squares need these drop listners to enable piece dragging for moving
+            square.addEventListener("dragover", handleDragOver);
+            square.addEventListener("drop", handleDrop);
 
             // Determine the color:
             // (row + col) is even for light squares (e.g., A1, B2)

@@ -870,6 +870,9 @@ function clearIndicators() {
     // don't clear check-indicators, they will be removed when board is re-rendered
     // we want them to stay until the move is made
     removeElementsByClass("move-indicator");
+
+    // the move button is the click box, which is separate from just the indicator
+    removeElementsByClass("move-button");
     removeElementsByClass("capture-indicator");
 }
 
@@ -881,11 +884,15 @@ function renderMoves(pieceType, startRow, startCol, moves) {
         const [row, col] = fromCoordinate(coordinate);
         const square = document.getElementById(coordinate);
 
+        const fullSquareClickBox = document.createElement("div");
+        fullSquareClickBox.classList.add("click-box");
         const indicator = document.createElement("button");
-        indicator.addEventListener("click", (event) => {
+        fullSquareClickBox.appendChild(indicator);
+
+        fullSquareClickBox.addEventListener("click", (event) => {
             makeMove(pieceType, startRow, startCol, event);
         });
-        indicator.classList.add("move-button");
+        fullSquareClickBox.classList.add("move-button");
 
         // guaranteed it is an opponent piece (via the getPossibleMoves call) if not empty square
         if (boardState[row][col] !== ".") {
@@ -893,7 +900,7 @@ function renderMoves(pieceType, startRow, startCol, moves) {
         } else {
             indicator.classList.add("move-indicator");
         }
-        square.appendChild(indicator);
+        square.appendChild(fullSquareClickBox);
     }
 }
 
@@ -901,6 +908,8 @@ function renderMoves(pieceType, startRow, startCol, moves) {
 function handleSquareClick(event) {
     if (event.target.classList.contains("square")) {
         clearIndicators();
+        // next click should bring up the move indicators again, so reset this
+        lastClickedPieceLocation = null;
     }
 }
 

@@ -117,15 +117,35 @@ p {
     cursor: pointer;
 }
 
+/* the main target of clicks when making moves */
+.click-box {
+    display: flex;
+    align-items: center;
+    position: absolute;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+}
+
 /* little circle */
 .move-indicator {
     position: absolute;
+
+    padding: 0;
+    margin: 0;
     width: 30%;
     height: 30%;
     
     border-radius: 50%;
+    /* disable default border of buttons */
+    border: none;
 
     background-color: #15aafa;
+
+    /* want the clicks to pass through to target the click-box instead */
+    pointer-events: none; 
 }
 
 /* box */
@@ -134,6 +154,10 @@ p {
     width: 100%;
     height: 100%;
     border: 4px solid #15aafa;
+    background: none;
+
+    /* want the clicks to pass through to target the click-box instead */
+    pointer-events: none; 
 }
 
 .check-indicator {

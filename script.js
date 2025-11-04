@@ -3,8 +3,8 @@ const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["f", "p", "p", "p", "p", "p", "p", "f"],
     [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", "P", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", "p", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     ["F", "P", "P", "P", "P", "P", "P", "F"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
@@ -47,6 +47,8 @@ var whiteQueenSidePossible = true;
 var whiteKingSidePossible = true;
 
 var lastClickedPieceLocation = null;
+// [piece, endCoordinate]
+var lastMove = {};
 
 const board = document.getElementById("board");
 function toLetter(num) {
@@ -153,7 +155,6 @@ function getPawnMoves(row, col, pieceType) {
     if (pawnOnStartingRow(row, pieceType)) {
         canMoveTwo = true;
     }
-    // skip en passant
     // white pawns move to decreasing row
     var direction = -1;
     if (isBlackPiece(pieceType)) direction = 1;
@@ -192,6 +193,18 @@ function getPawnMoves(row, col, pieceType) {
         moves.push(target4);
     }
 
+    // only check en passant starting on the second move to avoid errors
+    if (!lastMove.endCoordinate) return moves;
+
+    const [lastMoveRow, lastMoveCol] = fromCoordinate(lastMove.endCoordinate);
+    // en passant
+    ROW_WHITE_CAN_EN_PASSANT = 3
+    ROW_BLACK_CAN_EN_PASSANT = 4
+    if (ROW_WHITE_CAN_EN_PASSANT === lastMoveRow && pieceType === "P" ||
+        ROW_BLACK_CAN_EN_PASSANT === lastMoveRow && pieceType === "p"
+    ) {
+        moves.push([lastMoveRow + direction, lastMoveCol]);
+    }
     return moves;
 }
 
@@ -534,7 +547,19 @@ function updateBoard(
     const KINGSIDEROOK = 7;
 
     board[startRow][startCol] = ".";
-    
+
+    // en passant happens if piece is a pawn, the startCol and targetCol are different, and the 
+    // target square is empty (i.e. we move columns without directly capturing on to a piece)
+    if (pieceType.toLowerCase() === "p" && startCol !== targetCol && board[targetRow][targetCol] === ".") {
+        // en passant captures the piece immediately behind, so determine forward direction first,
+        // then flip it to get the opposite direction of movement
+        var forward = -1;
+        if (isBlackPiece(pieceType)) forward = 1;
+        const backward = forward * -1;
+        board[targetRow + backward][targetCol] = ".";
+        console.log('en passant!');
+    }
+
     // handle promotion -- auto queen
     // since pawns can't move backwards, just using the target row is sufficient to determine the colour
     if (pieceType.toLowerCase() === "p" && targetRow === BLACKROW) board[targetRow][targetCol] = "Q";
@@ -546,7 +571,7 @@ function updateBoard(
     const targetCoordinate = toCoordinate(targetRow, targetCol);
     
     // this is a castle since king moves 2 squares, need to additionally move the rook
-    if (pieceType.toLowerCase() === "k" && Math.abs(startCol - targetCol) == 2) {
+    if (pieceType.toLowerCase() === "k" && Math.abs(startCol - targetCol) === 2) {
         if (targetCoordinate === "c1") {
             board[WHITEROW][QUEENSIDEROOK] = ".";
             board[WHITEROW][QUEENSIDE] = "R";
@@ -580,7 +605,7 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
     const KINGCROSS = 5;
     const filtered = moves.filter(([row, col]) => {
         // castling case
-        if (pieceType.toLowerCase() === "k" && Math.abs(startCol - col) == 2) {
+        if (pieceType.toLowerCase() === "k" && Math.abs(startCol - col) === 2) {
             // can't castle while in check
             if (isInCheck(boardState, turn)) {
                 return false;
@@ -828,6 +853,9 @@ function makeMove(pieceType, startRow, startCol, event) {
         tryMoveFlagPassenger(boardState, pieceType, startRow, startCol, endRow, endCol);
     }
 
+    lastMove.piece = pieceType;
+    lastMove.endCoordinate = endingSquare;
+
     if (turn === "W") {
         var bagToUse = whiteBag;
         var bagToUnhighlight = document.getElementById("white-bag");
@@ -847,7 +875,6 @@ function makeMove(pieceType, startRow, startCol, event) {
         } else {
             blackBag = new Set([...pieceList]);
         }
-        console.log("Reset Bag!");
     }
 
     renderBags();

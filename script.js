@@ -200,8 +200,8 @@ function getPawnMoves(row, col, pieceType) {
     // en passant
     ROW_WHITE_CAN_EN_PASSANT = 3
     ROW_BLACK_CAN_EN_PASSANT = 4
-    if (ROW_WHITE_CAN_EN_PASSANT === lastMoveRow && pieceType === "P" ||
-        ROW_BLACK_CAN_EN_PASSANT === lastMoveRow && pieceType === "p"
+    if ((ROW_WHITE_CAN_EN_PASSANT === row && pieceType === "P" ||
+        ROW_BLACK_CAN_EN_PASSANT === row && pieceType === "p")
     ) {
         moves.push([lastMoveRow + direction, lastMoveCol]);
     }

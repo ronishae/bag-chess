@@ -1011,15 +1011,32 @@ function makeMove(pieceType, startRow, startCol, event) {
         var bagToHighlight = document.getElementById("white-bag");
     }
     bagToUse.delete(pieceType.toLowerCase());
+    // toggle bag move rights for the piece in the zobrist hash
+    zobristHash ^= zobristKeys.bag[pieceType];
 
     if (bagHasNoMoves(bagToUse)) {
         // need to duplicate this check since JS can't dereference pointers to actually update the real bag
         // using the bagToUse variable
         if (turn === "W") {
+            // toggle the current rights once because everything is about to be toggled once
+            // and toggling twice would cancel out
+            for (var oldPiece of bagToUse) {
+                zobristHash ^= zobristKeys.bag[oldPiece.toUpperCase()];
+            }
             whiteBag = new Set([...pieceList]);
+            for (var newPiece of whiteBag) {
+                zobristHash ^= zobristKeys.bag[newPiece.toUpperCase()];
+            }
         } else {
+            for (var oldPiece of bagToUse) {
+                zobristHash ^= zobristKeys.bag[oldPiece.toLowerCase()];
+            }
             blackBag = new Set([...pieceList]);
+            for (var newPiece of whiteBag) {
+                zobristHash ^= zobristKeys.bag[newPiece.toLowerCase()];
+            }
         }
+        
     }
 
     renderBags();
@@ -1032,7 +1049,7 @@ function makeMove(pieceType, startRow, startCol, event) {
         turn = "W";
     }
     // toggle turn in zobrist hash
-    zobristHash ^= zobristKeys.turn;
+    zobristHash ^= zobristKeys.side;
     
     const inCheck = isInCheck(boardState, turn);
     const [kingRow, kingCol] = locateKing(boardState, turn);

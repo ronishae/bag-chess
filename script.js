@@ -878,7 +878,7 @@ function detectEndOfGame() {
             } else {
                 // they had no legal moves because the bag restricted all their pieces
                 // this is the new bagmate.
-                console.log("Bag-Mate! Game Over.");
+                console.log("Bagmate! Game Over.");
             }
         }
     }

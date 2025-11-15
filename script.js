@@ -1,4 +1,6 @@
 const SIZE = 8;
+
+// do not change this; use for final implementation
 const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["f", "p", "p", "p", "p", "p", "p", "f"],
@@ -9,7 +11,21 @@ const INIT = [
     ["F", "P", "P", "P", "P", "P", "P", "F"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ];
-const boardState = INIT;
+
+// modify to anything for testing
+const testBoard = [
+    ["r", ".", ".", ".", "k", ".", ".", "r"],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    ["R", ".", ".", ".", "K", ".", ".", "R"],
+];
+
+// set this to INIT or testBoard as needed
+const boardState = testBoard;
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
     f: "flag",
@@ -28,6 +44,8 @@ var whiteBag = new Set([...pieceList]);
 var turn = "W"; // 'W' for White's turn, 'B' for Black
 var zobristHash = 0n;
 var zobristEnPassant = -1; // only one file can be a target, -1 for none
+// maps zobrist hash to frequency of occurrence
+var positionHistory = new Map(); 
 
 // for implenetation of dragging pieces to move them
 // is used in event.dataTransfer
@@ -180,6 +198,26 @@ function initializeZobristKeys() {
 }
 
 const zobristKeys = initializeZobristKeys();
+
+function checkThreeFoldRepetition() {
+    // Convert BigInt key to string for reliable Map lookup
+    const hashString = zobristHash.toString();
+    const count = positionHistory.get(hashString) || 0;
+    
+    // If the hash has been seen twice before, the current position is the third instance.
+    return count >= 2; 
+}
+
+function savePositionToHistory() {
+    const hashString = zobristHash.toString();
+    
+    const currentCount = positionHistory.get(hashString) || 0;
+    const newCount = currentCount + 1;
+    positionHistory.set(hashString, newCount);
+
+    return newCount;
+}
+
 
 
 // all the get move functions still need to be validated for checks, pins, can't capture king
@@ -441,6 +479,7 @@ function locateKing(board, colour) {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             const piece = board[row][col];
+            console.log(piece);
             if (colour === "W" && piece === "K") {
                 return [row, col];
             }
@@ -760,6 +799,11 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
 }
 
 function detectEndOfGame() {
+    if (checkThreeFoldRepetition()) {
+        console.log("Threefold repetition! Game Over.");
+        return;
+    }
+
     const inCheck = isInCheck(boardState, turn);
 
     // iterate through all pieces of the current player and look for legal moves.
@@ -1100,7 +1144,10 @@ function makeMove(pieceType, startRow, startCol, event) {
     console.log("Current hash:", zobristHash);
     clearIndicators();
     renderBoard(boardState, inCheck, kingRow, kingCol);
-    detectEndOfGame();
+    
+    savePositionToHistory(); // after hash is fully updated, store the occurence
+    console.log(positionHistory);
+    detectEndOfGame(); // will check the hash in this function
 }
 
 function clearIndicators() {
@@ -1346,7 +1393,7 @@ function init() {
     }
     initializeZobristHash();
     console.log("Init hash:", zobristHash);
-    renderBoard(INIT);
+    renderBoard(boardState);
 }
 
 init();

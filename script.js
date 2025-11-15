@@ -14,14 +14,14 @@ const INIT = [
 
 // modify to anything for testing
 const testBoard = [
-    ["r", ".", ".", ".", "k", ".", ".", "r"],
+    [".", ".", ".", ".", "k", ".", ".", "r"],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", "K", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
     [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", ".", ".", ".", ".", "."],
-    [".", ".", ".", ".", ".", ".", ".", "."],
-    ["R", ".", ".", ".", "K", ".", ".", "R"],
+    [".", ".", ".", ".", ".", ".", ".", "R"],
 ];
 
 // set this to INIT or testBoard as needed
@@ -421,13 +421,13 @@ function getKingMoves(row, col, pieceType) {
     ];
     const moves = getSetDistanceMoves(row, col, directions, pieceType);
     // white queenside
-    if (turn === "W") {
-        if (hasSpaceToQueensideCastle(whiteQueenSidePossible, row, col)) moves.push([row, col - 2]);
-        if (hasSpaceToKingsideCastle(whiteKingSidePossible, row, col)) moves.push([row, col + 2]);
+    if (turn === "W" && row === 7 && col === 4) {
+        if (hasSpaceToQueensideCastle(whiteQueenSidePossible, row, col) && boardState[7][0] === 'R') moves.push([row, col - 2]);
+        if (hasSpaceToKingsideCastle(whiteKingSidePossible, row, col) && boardState[7][7] === 'R') moves.push([row, col + 2]);
     }
-    else {
-        if (hasSpaceToQueensideCastle(blackQueenSidePossible, row, col)) moves.push([row, col - 2]);
-        if (hasSpaceToKingsideCastle(blackKingSidePossible, row, col)) moves.push([row, col + 2]);
+    else if (turn === "B" && row === 0 && col === 4) {
+        if (hasSpaceToQueensideCastle(blackQueenSidePossible, row, col) && boardState[0][0] === 'r') moves.push([row, col - 2]);
+        if (hasSpaceToKingsideCastle(blackKingSidePossible, row, col) && boardState[0][7] === 'r') moves.push([row, col + 2]);
     }
     return moves;
 }
@@ -479,7 +479,6 @@ function locateKing(board, colour) {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             const piece = board[row][col];
-            console.log(piece);
             if (colour === "W" && piece === "K") {
                 return [row, col];
             }
@@ -540,6 +539,23 @@ function isInCheck(board, colour) {
 
     for (let [dx, dy] of knightAttackers) {
         if (hasAttackerAt(board, kingRow + dx, kingCol + dy, kingPiece, "N")) {
+            return true;
+        }
+    }
+
+    const kingAttackers = [
+        [-1, 0],
+        [-1, 1],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+        [1, -1],
+        [0, -1],
+        [-1, -1],
+    ];
+
+    for (let [dx, dy] of kingAttackers) {
+        if (hasAttackerAt(board, kingRow + dx, kingCol + dy, kingPiece, "K")) {
             return true;
         }
     }
@@ -808,6 +824,8 @@ function detectEndOfGame() {
 
     // iterate through all pieces of the current player and look for legal moves.
     let legalMoveExists = false;
+    let hasSurvivingPieceWithBagRights = false;
+    let bagToUse = (turn === "W") ? whiteBag : blackBag;
 
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -817,11 +835,14 @@ function detectEndOfGame() {
             const isMyPiece =
                 (turn === "W" && !isBlackPiece(pieceType)) ||
                 (turn === "B" && isBlackPiece(pieceType));
+            if (!isMyPiece) continue;
+            
+            if (pieceType.toLowerCase() === 'f' || bagToUse.has(pieceType.toLowerCase())) {
+                // ff this is true, the player has at least one piece they have the right to move.
+                // if no legal moves are found, it must be a traditional stalemate.
+                hasSurvivingPieceWithBagRights = true; 
 
-            if (isMyPiece) {
                 const possibleMoves = getPossibleMoves(row, col, pieceType);
-
-                // find moves that do not leave king in check
                 const legalMoves = getLegalMoves(
                     row,
                     col,
@@ -844,15 +865,22 @@ function detectEndOfGame() {
 
     // TODO: disable buttons and implement end of game
 
-    // checkmate
-    // must be in check to be checkmate
-    if (!legalMoveExists && inCheck) {
-        console.log("Checkmate! Game Over.");
-    }
-        
-    else if (!legalMoveExists) {
-        // need to test stalemate later
-        console.log("Stalemate! Game Over");
+    if (!legalMoveExists) {
+         // simple checkmate
+        if (inCheck) {
+            console.log("Checkmate! Game Over.");
+        } 
+        // not in check, but no legal moves.
+        else {
+            if (hasSurvivingPieceWithBagRights) {
+                // they had the *right* to move a piece, but that piece was trapped.
+                console.log("Stalemate! Game Over.");
+            } else {
+                // they had no legal moves because the bag restricted all their pieces
+                // this is the new bagmate.
+                console.log("Bag-Mate! Game Over.");
+            }
+        }
     }
 }
 
@@ -1059,7 +1087,7 @@ function makeMove(pieceType, startRow, startCol, event) {
     let newEnPassantCol = -1;
     if (pieceType.toLowerCase() === "p" && Math.abs(startRow - endRow) === 2) {
         newEnPassantCol = endCol; 
-}
+    }
     setNewEnPassantHash(newEnPassantCol);
     
     const currentCastlingRights = [

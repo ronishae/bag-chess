@@ -1,10 +1,75 @@
 body {
     display: flex;
-    font-family: Verdana, Geneva, Tahoma, sans-serif
+    flex-direction: column;
+    font-family: 'Inter', "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f4f7f6;
+    color: #3d3d3d;
+    line-height: 1.6;
+}
+
+#rules {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+#rules h1 {
+    text-align: center;
+    color: #036b87;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 30px;
+}
+
+/* --- Rule Card Styling --- */
+.rule-card {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.rule-card h2 {
+    color: #036b87;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #eaecee;
+}
+
+.rule-card p {
+    font-size: 1rem;
+    margin-bottom: 15px;
+}
+
+/* Don't add bottom margin to the last paragraph in a card */
+.rule-card p:last-child {
+    margin-bottom: 0;
+}
+
+/* --- Highlighting --- */
+.rule-card b {
+    color: #c0392b;
+    font-weight: 600;
+}
+
+.highlight-text {
+    background-color: #fffedf;
+    padding: 10px 15px;
+    border-radius: 8px;
+}
+
+/* make clarifications gray to not stand out */
+.clarification h2 {
+    color: #5d6d7e;
 }
 
 #game-container {
-    user-select: none;
+    user-select: none;  
     margin: 5px;
 }
 

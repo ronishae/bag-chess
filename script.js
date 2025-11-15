@@ -1,4 +1,6 @@
 const SIZE = 8;
+
+// do not change this; use for final implementation
 const INIT = [
     ["r", "n", "b", "q", "k", "b", "n", "r"],
     ["f", "p", "p", "p", "p", "p", "p", "f"],
@@ -9,7 +11,21 @@ const INIT = [
     ["F", "P", "P", "P", "P", "P", "P", "F"],
     ["R", "N", "B", "Q", "K", "B", "N", "R"],
 ];
-const boardState = INIT;
+
+// modify to anything for testing
+const testBoard = [
+    ["r", ".", ".", ".", "k", ".", ".", "r"],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", ".", "."],
+    ["R", ".", ".", ".", "K", ".", ".", "R"],
+];
+
+// set this to INIT or testBoard as needed
+const boardState = testBoard;
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
     f: "flag",
@@ -26,6 +42,10 @@ var blackBag = new Set([...pieceList]);
 var whiteBag = new Set([...pieceList]);
 
 var turn = "W"; // 'W' for White's turn, 'B' for Black
+var zobristHash = 0n;
+var zobristEnPassant = -1; // only one file can be a target, -1 for none
+// maps zobrist hash to frequency of occurrence
+var positionHistory = new Map(); 
 
 // for implenetation of dragging pieces to move them
 // is used in event.dataTransfer
@@ -116,6 +136,89 @@ function convertMoves(moves) {
     if (!moves) return [];
     return moves.map(([r, c]) => toCoordinate(r, c));
 }
+
+// Function to generate a random 64-bit BigInt
+function generateRandomBigInt() {
+    // Generate four 16-bit numbers and combine them
+    const p1 = BigInt(Math.floor(Math.random() * 65536));
+    const p2 = BigInt(Math.floor(Math.random() * 65536));
+    const p3 = BigInt(Math.floor(Math.random() * 65536));
+    const p4 = BigInt(Math.floor(Math.random() * 65536));
+
+    // Combine them into a single 64-bit number using bitwise shifts and OR
+    // appending 'n' to a number is the way to denote BigInt literals in JS
+    return (p4 << 48n) | (p3 << 32n) | (p2 << 16n) | p1;
+}
+
+
+const NUM_PIECE_TYPE = 14; // p, r, n, b, q, k, f for both colours
+const NUM_BAG_PIECES = 12;
+const NUM_SQUARES = 64;
+
+function initializeZobristKeys() {
+    const keys = {
+        // Piece keys are now accessed by character and [row][col] index.
+        // Piece characters: P, N, B, R, Q, K, F (White) and p, n, b, r, q, k, f (Black)
+        pieces: {},
+
+        // Side to move (only one key for 'b' to toggle from 'w')
+        side: generateRandomBigInt(),
+
+        // Castling rights (4 keys for KQkq)
+        castling: {
+            'K': generateRandomBigInt(), // White Kingside
+            'Q': generateRandomBigInt(), // White Queenside
+            'k': generateRandomBigInt(), // Black Kingside
+            'q': generateRandomBigInt(), // Black Queenside
+        },
+
+        // En Passant target files (8 keys for files a-h, or 0-7)
+        enPassant: Array(8).fill(0).map(() => generateRandomBigInt()),
+        bag: {},
+    };
+
+    const pieceChars = ['P', 'N', 'B', 'R', 'Q', 'K', 'F', 'p', 'n', 'b', 'r', 'q', 'k', 'f'];
+    const bagChars = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
+    
+    for (const char of pieceChars) {
+        keys.pieces[char] = [];
+        for (let row = 0; row < 8; row++) {
+            keys.pieces[char][row] = [];
+            for (let col = 0; col < 8; col++) {
+                keys.pieces[char][row][col] = generateRandomBigInt();
+            }
+        }
+    }
+
+    for (const char of bagChars) {
+        keys.bag[char] = generateRandomBigInt();
+    }
+
+    return keys;
+}
+
+const zobristKeys = initializeZobristKeys();
+
+function checkThreeFoldRepetition() {
+    // Convert BigInt key to string for reliable Map lookup
+    const hashString = zobristHash.toString();
+    const count = positionHistory.get(hashString) || 0;
+    
+    // If the hash has been seen twice before, the current position is the third instance.
+    return count >= 2; 
+}
+
+function savePositionToHistory() {
+    const hashString = zobristHash.toString();
+    
+    const currentCount = positionHistory.get(hashString) || 0;
+    const newCount = currentCount + 1;
+    positionHistory.set(hashString, newCount);
+
+    return newCount;
+}
+
+
 
 // all the get move functions still need to be validated for checks, pins, can't capture king
 // TODO: still unsure on the exact moves I want
@@ -376,6 +479,7 @@ function locateKing(board, colour) {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             const piece = board[row][col];
+            console.log(piece);
             if (colour === "W" && piece === "K") {
                 return [row, col];
             }
@@ -531,6 +635,9 @@ function getPossibleMoves(row, col, pieceType) {
 }
 
 
+// this function will handle zobrist hash changes, but since it is called
+// in multiple places, we will return the hash instead of modifying it
+// so only the call in makeMove will update the zobrist hash (as opposed to the ones in hypothetical board moves)
 function updateBoard(
     board,
     pieceType,
@@ -539,6 +646,11 @@ function updateBoard(
     targetRow,
     targetCol
 ) {
+    var currentHash = zobristHash;
+
+    // remove piece from starting square
+    currentHash ^= zobristKeys.pieces[pieceType][startRow][startCol];
+
     const WHITEROW = 7;
     const BLACKROW = 0;
     const QUEENSIDE = 3;
@@ -560,36 +672,57 @@ function updateBoard(
         console.log('en passant!');
     }
 
+    // tracks the piece that will eventually go into the target square
+    // either it is a queen because it promoted, or it is just the piece that moved
+    var newPieceAtTarget = pieceType;
     // handle promotion -- auto queen
     // since pawns can't move backwards, just using the target row is sufficient to determine the colour
-    if (pieceType.toLowerCase() === "p" && targetRow === BLACKROW) board[targetRow][targetCol] = "Q";
-    else if (pieceType.toLowerCase() === "p" && targetRow === WHITEROW) board[targetRow][targetCol] = "q";
-    else {
-        board[targetRow][targetCol] = pieceType;
+    if (pieceType.toLowerCase() === "p" && targetRow === BLACKROW) newPieceAtTarget = "Q";
+    else if (pieceType.toLowerCase() === "p" && targetRow === WHITEROW) newPieceAtTarget = "q";
+
+    const capturedPiece = board[targetRow][targetCol];
+    if (capturedPiece !== ".") {
+        // remove captured piece from hash
+        currentHash ^= zobristKeys.pieces[capturedPiece][targetRow][targetCol];
     }
+
+    board[targetRow][targetCol] = newPieceAtTarget;
+    // move piece to target square in the hash
+    currentHash ^= zobristKeys.pieces[newPieceAtTarget][targetRow][targetCol];
 
     const targetCoordinate = toCoordinate(targetRow, targetCol);
     
     // this is a castle since king moves 2 squares, need to additionally move the rook
     if (pieceType.toLowerCase() === "k" && Math.abs(startCol - targetCol) === 2) {
+        // need to update the zobrist hash for the rook move as well
+        // rook should be hashed out of its original square and into its new square
         if (targetCoordinate === "c1") {
             board[WHITEROW][QUEENSIDEROOK] = ".";
             board[WHITEROW][QUEENSIDE] = "R";
+            currentHash ^= zobristKeys.pieces["R"][WHITEROW][QUEENSIDEROOK];
+            currentHash ^= zobristKeys.pieces["R"][WHITEROW][QUEENSIDE];
         }
         else if (targetCoordinate === "g1") {
             board[WHITEROW][KINGSIDEROOK] = ".";
             board[WHITEROW][KINGSIDE] = "R";
+            currentHash ^= zobristKeys.pieces["R"][WHITEROW][KINGSIDEROOK];
+            currentHash ^= zobristKeys.pieces["R"][WHITEROW][KINGSIDE];
         }
         else if (targetCoordinate === "c8") {
             board[BLACKROW][QUEENSIDEROOK] = ".";
             board[BLACKROW][QUEENSIDE] = "r";
+            currentHash ^= zobristKeys.pieces["r"][BLACKROW][QUEENSIDEROOK];
+            currentHash ^= zobristKeys.pieces["r"][BLACKROW][QUEENSIDE];
         }
         else if (targetCoordinate === "g8") {
             board[BLACKROW][KINGSIDEROOK] = ".";
             board[BLACKROW][KINGSIDE] = "r";
+            currentHash ^= zobristKeys.pieces["r"][BLACKROW][KINGSIDEROOK];
+            currentHash ^= zobristKeys.pieces["r"][BLACKROW][KINGSIDE];
         }
     }
-    
+
+    return currentHash;
 }
 
 // will need to handle castling specifically later
@@ -666,6 +799,11 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
 }
 
 function detectEndOfGame() {
+    if (checkThreeFoldRepetition()) {
+        console.log("Threefold repetition! Game Over.");
+        return;
+    }
+
     const inCheck = isInCheck(boardState, turn);
 
     // iterate through all pieces of the current player and look for legal moves.
@@ -821,6 +959,43 @@ function getFlagPassengerSquare(startRow, startCol, passengerDirection) {
     return [startRow + passengerDirection[0], startCol + passengerDirection[1]];
 }
 
+// updates zobrist hash for moving passenger piece of a flag bearer move
+// it also updates the board state to handle the actual move
+// returns the new hash since this is called for hypothetical moves as well
+// it should only update on actual moves
+function handlePassengerMove(board, passengerPiece, startRow, startCol, endRow, endCol) {
+    var currentHash = zobristHash;
+    const startingCoordinate = toCoordinate(startRow, startCol);
+    const endingCoordinate = toCoordinate(endRow, endCol);
+
+    // remove passenger piece from source square
+    currentHash ^= zobristKeys.pieces[passengerPiece][startRow][startCol];
+    
+    // add passenger piece to target square
+    currentHash ^= zobristKeys.pieces[passengerPiece][endRow][endCol];
+
+    // board uodate
+    board[startRow][startCol] = ".";
+    board[endRow][endCol] = passengerPiece;
+
+    // Update the global boolean flags based on the passenger's movement
+    const currentCastlingRights = [
+        blackQueenSidePossible, blackKingSidePossible, 
+        whiteQueenSidePossible, whiteKingSidePossible
+    ];
+    updateCastlingStateAfterMove(passengerPiece, startingCoordinate, endingCoordinate);
+    
+    const newCastlingRights = [
+        blackQueenSidePossible, blackKingSidePossible, 
+        whiteQueenSidePossible, whiteKingSidePossible
+    ];
+    
+    // Update Zobrist Hash for lost rights (XOR OUT any rights that went from true -> false)
+    updateZobristCastling(currentCastlingRights, newCastlingRights);
+
+    return currentHash;
+}
+
 // Cannot move pawns.
 // this might move a king into check or cause a check state, so flag moves should be validated first
 function tryMoveFlagPassenger(board, pieceType, startRow, startCol, endRow, endCol) {
@@ -833,7 +1008,42 @@ function tryMoveFlagPassenger(board, pieceType, startRow, startCol, endRow, endC
         if (isEmptySquare(board, ...passengerTargetSquare) 
             && isSameColour(pieceType, passengerPiece) 
             && passengerPiece.toLowerCase() !== "p") {
-            updateBoard(board, passengerPiece, ...passengerSquare, ...passengerTargetSquare);
+            zobristHash = handlePassengerMove(
+                board, 
+                passengerPiece, 
+                ...passengerSquare, 
+                ...passengerTargetSquare
+            );
+        }
+    }
+}
+
+// Cleares the old en passant hash key if it exists
+// also updates the global state en passant column
+function clearOldEnPassantHash() {
+    if (zobristEnPassant !== -1) {
+        zobristHash ^= zobristKeys.enPassant[zobristEnPassant];
+    }
+    zobristEnPassant = -1;
+}
+
+// updates the hash and updates the global state
+function setNewEnPassantHash(newCol) {
+    if (newCol !== -1) {
+        zobristHash ^= zobristKeys.enPassant[newCol];
+    }
+    zobristEnPassant = newCol; 
+}
+
+// currentRights should be saved before newRights are determined
+// called once after new castling rights are determined
+function updateZobristCastling(currentRights, newRights) {
+    const castlingKeys = ['q', 'k', 'Q', 'K'];
+    for (let i = 0; i < currentRights.length; i++) {
+        if (currentRights[i] === true && newRights[i] === false) {
+            // rights changed, so toggle it
+            // it will never get toggled back on since rights can only go from true to false
+            zobristHash ^= zobristKeys.castling[castlingKeys[i]];
         }
     }
 }
@@ -844,12 +1054,33 @@ function makeMove(pieceType, startRow, startCol, event) {
     const endingSquare = parent.id;
     const [endRow, endCol] = fromCoordinate(endingSquare);
 
-    updateCastlingStateAfterMove(pieceType, startingSquare, endingSquare);
+    // Handle en passant for Zobrist hashing
+    clearOldEnPassantHash();
+    let newEnPassantCol = -1;
+    if (pieceType.toLowerCase() === "p" && Math.abs(startRow - endRow) === 2) {
+        newEnPassantCol = endCol; 
+}
+    setNewEnPassantHash(newEnPassantCol);
     
-    updateBoard(boardState, pieceType, startRow, startCol, endRow, endCol);
+    const currentCastlingRights = [
+        blackQueenSidePossible, blackKingSidePossible, 
+        whiteQueenSidePossible, whiteKingSidePossible
+    ];
+    updateCastlingStateAfterMove(pieceType, startingSquare, endingSquare);
+    const newCastlingRights = [
+        blackQueenSidePossible, blackKingSidePossible, 
+        whiteQueenSidePossible, whiteKingSidePossible
+    ]
+    updateZobristCastling(currentCastlingRights, newCastlingRights);
+    
+    // updateBoard returns the new zobrist hash after the move
+    // updateBoard handles promotion, castling, capturing, and moving updates
+    zobristHash = updateBoard(boardState, pieceType, startRow, startCol, endRow, endCol);
+
     // handle flag move specifically
     // move passenger after moving the piece so it is allowed to move into the flag piece's old spot
     if (pieceType.toLowerCase() === "f") {
+        // this will automatically update the zobrist hash for the passenger move as well
         tryMoveFlagPassenger(boardState, pieceType, startRow, startCol, endRow, endCol);
     }
 
@@ -866,15 +1097,34 @@ function makeMove(pieceType, startRow, startCol, event) {
         var bagToHighlight = document.getElementById("white-bag");
     }
     bagToUse.delete(pieceType.toLowerCase());
-
+    // toggle bag move rights for the piece in the zobrist hash
+    if (pieceType.toLowerCase() !== 'f') {
+        zobristHash ^= zobristKeys.bag[pieceType];
+    }
+    
     if (bagHasNoMoves(bagToUse)) {
         // need to duplicate this check since JS can't dereference pointers to actually update the real bag
         // using the bagToUse variable
         if (turn === "W") {
+            // toggle the current rights once because everything is about to be toggled once
+            // and toggling twice would cancel out
+            for (var oldPiece of bagToUse) {
+                zobristHash ^= zobristKeys.bag[oldPiece.toUpperCase()];
+            }
             whiteBag = new Set([...pieceList]);
+            for (var newPiece of pieceList  ) {
+                zobristHash ^= zobristKeys.bag[newPiece.toUpperCase()];
+            }
         } else {
+            for (var oldPiece of bagToUse) {
+                zobristHash ^= zobristKeys.bag[oldPiece.toLowerCase()];
+            }
             blackBag = new Set([...pieceList]);
+            for (var newPiece of pieceList) {
+                zobristHash ^= zobristKeys.bag[newPiece.toLowerCase()];
+            }
         }
+        
     }
 
     renderBags();
@@ -886,11 +1136,18 @@ function makeMove(pieceType, startRow, startCol, event) {
     } else {
         turn = "W";
     }
+    // toggle turn in zobrist hash
+    zobristHash ^= zobristKeys.side;
+    
     const inCheck = isInCheck(boardState, turn);
     const [kingRow, kingCol] = locateKing(boardState, turn);
+    console.log("Current hash:", zobristHash);
     clearIndicators();
     renderBoard(boardState, inCheck, kingRow, kingCol);
-    detectEndOfGame();
+    
+    savePositionToHistory(); // after hash is fully updated, store the occurence
+    console.log(positionHistory);
+    detectEndOfGame(); // will check the hash in this function
 }
 
 function clearIndicators() {
@@ -1068,6 +1325,41 @@ function renderBoard(board, check, checkedRow, checkedCol) {
     }
 }
 
+function initializeZobristHash() {
+    // A. Hash all Pieces on the Board
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const pieceChar = boardState[row][col];
+            
+            if (pieceChar !== '.') {
+                // XOR the key for the specific piece at the specific [row][col]
+                zobristHash ^= zobristKeys.pieces[pieceChar][row][col];
+            }
+        }
+    }
+
+    // B. Hash Side to Move (White to move at start, so we do NOT XOR the ZobristKeys.side)
+    // The starting hash implicitly represents White to move.
+    // If it were Black to move, we would do: hash ^= ZobristKeys.side;
+
+    // C. Hash Castling Rights
+    // In the standard starting position, all four rights are available.
+    zobristHash ^= zobristKeys.castling['K'];
+    zobristHash ^= zobristKeys.castling['Q'];
+    zobristHash ^= zobristKeys.castling['k'];
+    zobristHash ^= zobristKeys.castling['q'];
+
+    // D. Hash En Passant Target
+    // In the standard starting position, there is no E.P. target.
+    // Therefore, no E.P. key is XORed.
+
+    // E. Bag State is also hashed
+    const bagChars = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
+    for (const pieceType of bagChars) {
+        zobristHash ^= zobristKeys.bag[pieceType];
+    }
+}
+
 function init() {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -1099,7 +1391,9 @@ function init() {
             board.appendChild(square);
         }
     }
-    renderBoard(INIT);
+    initializeZobristHash();
+    console.log("Init hash:", zobristHash);
+    renderBoard(boardState);
 }
 
 init();

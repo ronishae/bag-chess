@@ -40,6 +40,8 @@ const MAPPING = {
 // will need to be reset, will use new on them instead of adding in a loop... maybe should do that. can do that later
 var blackBag = new Set([...pieceList]);
 var whiteBag = new Set([...pieceList]);
+var whiteTimer = null;
+var blackTimer = null;
 
 var turn = "W"; // 'W' for White's turn, 'B' for Black
 var zobristHash = 0n;
@@ -1087,6 +1089,7 @@ function updateZobristCastling(currentRights, newRights) {
 }
 
 function makeMove(pieceType, startRow, startCol, event) {
+    flipTimer(blackTimer, whiteTimer);
     const parent = event.target.parentElement;
     const startingSquare = toCoordinate(startRow, startCol);
     const endingSquare = parent.id;
@@ -1410,6 +1413,156 @@ function initializeZobristHash() {
     }
 }
 
+class ChessTimer {
+    constructor(elementId, initialSeconds = 600) {
+        this.element = document.getElementById(elementId);
+        if (!this.element) {
+            console.error(`Timer element with ID "${elementId}" not found.`);
+            return;
+        }
+        
+        this.initialTimeInMs = initialSeconds * 1000;
+        this.remainingTimeInMs = this.initialTimeInMs;
+        
+        this.isRunning = false;
+        this.deadline = null; // The exact timestamp when the timer should end
+        this.rafId = null; // Stores the requestAnimationFrame ID
+        
+        this.updateDisplay(); // Show initial time
+    }
+
+
+    /**
+     * Updates the timer's HTML element.
+     */
+    updateDisplay() {
+        if (this.element) {
+            this.element.textContent = this.formatTime();
+        }
+    }
+
+    /**
+     * Formats remaining milliseconds into a time string.
+     * - h:mm:ss if time is >= 1 hour.
+     * - mm:ss if time is >= 10 seconds.
+     * - ss.ms (e.g., 09.456) if time is < 10 seconds.
+     */
+    formatTime() {
+        const totalMs = Math.max(0, this.remainingTimeInMs);
+        const pad = (num, length = 2) => Math.floor(num).toString().padStart(length, '0');
+
+        // --- Under 10 seconds: Show ss.ms ---
+        if (totalMs < 10000) {
+            const seconds = totalMs / 1000;
+            const s = pad(seconds);
+            const ms = pad(totalMs % 1000, 3);
+            return `${s}.${ms}`;
+        }
+
+        // --- 10 seconds or more: Show h:mm:ss or mm:ss ---
+        // We use Math.ceil to ensure the display ticks down by 1 second
+        const totalSeconds = Math.ceil(totalMs / 1000);
+        
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        if (h > 0) {
+            // Only show hours if it's non-zero
+            return `${h}:${pad(m)}:${pad(s)}`;
+        } else {
+            // Show mm:ss
+            return `${pad(m)}:${pad(s)}`;
+        }
+    }
+
+    tick() {
+        if (!this.isRunning) return;
+
+        // Calculate time left based on the deadline
+        const timeRemaining = this.deadline - Date.now();
+        
+        // Store the previous display value (in seconds) to check against
+        const lastDisplayedSecond = Math.ceil(this.remainingTimeInMs / 1000);
+        
+        this.remainingTimeInMs = timeRemaining;
+
+        if (this.remainingTimeInMs <= 0) {
+            // Time is up
+            this.remainingTimeInMs = 0;
+            this.updateDisplay();
+            this.stop(); // This also clears the animation frame
+            console.log("Time's up!");
+            // TODO: Add game-over logic on timeout
+        } else {
+            // Still running
+            const newDisplayedSecond = Math.ceil(this.remainingTimeInMs / 1000);
+
+            // We only update the DOM (which is expensive) if:
+            // 1. We are in millisecond mode (< 10s), which needs constant updates.
+            // 2. The displayed second has actually changed (e.g., from 11s to 10s).
+            if (this.remainingTimeInMs < 10000 || newDisplayedSecond !== lastDisplayedSecond) {
+                this.updateDisplay();
+            }
+            
+            // Request the next frame
+            this.rafId = requestAnimationFrame(this.tick.bind(this));
+        }
+    }
+
+    start() {
+        if (this.isRunning || this.remainingTimeInMs <= 0) return;
+
+        this.isRunning = true;
+        
+        // Set the new deadline by adding the remaining time to the current time
+        this.deadline = Date.now() + this.remainingTimeInMs;
+        
+        // Start the animation loop
+        this.rafId = requestAnimationFrame(this.tick.bind(this));
+    }
+
+    stop() {
+        if (!this.isRunning) return;
+
+        this.isRunning = false;
+        cancelAnimationFrame(this.rafId);
+        
+        // This is the critical part:
+        // We calculate and save the *exact* remaining milliseconds.
+        // If the deadline hasn't been reached, this will be a positive number.
+        // If time ran out (in the tick), this will be 0 or negative.
+        this.remainingTimeInMs = this.deadline - Date.now();
+        
+        // Clamp at 0
+        if (this.remainingTimeInMs < 0) {
+            this.remainingTimeInMs = 0;
+        }
+        
+        // Update the display to show the final paused time
+        this.updateDisplay();
+    }
+
+    toggle() {
+        if (this.isRunning) {
+            this.stop();
+        } else {
+            this.start();
+        }
+    }
+
+    reset() {
+        this.stop();
+        this.remainingTimeInMs = this.initialTimeInMs;
+        this.updateDisplay();
+    }
+}
+
+function flipTimer(timer1, timer2) {
+    timer1.toggle();
+    timer2.toggle();
+}
+
 function init() {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -1443,6 +1596,13 @@ function init() {
     }
     initializeZobristHash();
     console.log("Init hash:", zobristHash);
+
+    const STARTING_TIME_SECONDS = 600; // 10 minutes
+    blackTimer = new ChessTimer("black-timer-text", STARTING_TIME_SECONDS);
+    whiteTimer = new ChessTimer("white-timer-text", STARTING_TIME_SECONDS);
+    
+    whiteTimer.start();
+
     renderBoard(boardState);
 }
 

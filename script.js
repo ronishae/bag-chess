@@ -25,7 +25,7 @@ const testBoard = [
 ];
 
 // set this to INIT or testBoard as needed
-const boardState = testBoard;
+const boardState = INIT;
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
     f: "flag",

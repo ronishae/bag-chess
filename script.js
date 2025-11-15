@@ -421,11 +421,11 @@ function getKingMoves(row, col, pieceType) {
     ];
     const moves = getSetDistanceMoves(row, col, directions, pieceType);
     // white queenside
-    if (turn === "W" && row === 7 && col === 4) {
+    if (turn === "W" && boardState[7][4] === 'K') {
         if (hasSpaceToQueensideCastle(whiteQueenSidePossible, row, col) && boardState[7][0] === 'R') moves.push([row, col - 2]);
         if (hasSpaceToKingsideCastle(whiteKingSidePossible, row, col) && boardState[7][7] === 'R') moves.push([row, col + 2]);
     }
-    else if (turn === "B" && row === 0 && col === 4) {
+    else if (turn === "B" && boardState[0][4] === 'k') {
         if (hasSpaceToQueensideCastle(blackQueenSidePossible, row, col) && boardState[0][0] === 'r') moves.push([row, col - 2]);
         if (hasSpaceToKingsideCastle(blackKingSidePossible, row, col) && boardState[0][7] === 'r') moves.push([row, col + 2]);
     }
@@ -937,39 +937,47 @@ function renderBags() {
 }
 
 
+// blackQueenSidePossible, blackKingSidePossible, whiteQueenSidePossible, whiteKingSidePossible
 function updateCastlingStateAfterMove(pieceType, startingSquare, endingSquare) {
+    let bq = blackQueenSidePossible;
+    let bk = blackKingSidePossible;
+    let wq = whiteQueenSidePossible;
+    let wk = whiteKingSidePossible;
+
     // one of the involved pieces moves
     if (pieceType === "K") {
-        whiteKingSidePossible = false;
-        whiteQueenSidePossible = false;
+        wk = false;
+        wq = false;
     } else if (pieceType === "k") {
-        blackKingSidePossible = false;
-        blackQueenSidePossible;
+        bk = false;
+        bq = false;
     } else if (pieceType === "R") {
         if (startingSquare === "a1") {
-            whiteQueenSidePossible = false;
+            wq = false;
         } else if (startingSquare === "h1") {
-            whiteKingSidePossible = false;
+            wk = false;
         }
     } else if (pieceType === "r") {
         if (startingSquare === "a8") {
-            blackQueenSidePossible = false;
+            bq = false;
         } else if (startingSquare === "h8") {
-            blackKingSidePossible = false;
+            bk = false;
         }
     }
 
     // square is the ending location, so if it ends on one of the rook locations
     // the rook must have been captured
     if (endingSquare === "a1") {
-        whiteQueenSidePossible = false;
+        wq = false;
     } else if (endingSquare === "h1") {
-        whiteKingSidePossible = false;
+        wk = false;
     } else if (endingSquare === "a8") {
-        blackQueenSidePossible = false;
+        bq = false;
     } else if (endingSquare === "h8") {
-        blackKingSidePossible = false;
+        bk = false;
     }
+
+    return [bq, bk, wq, wk];
 }
 
 // passengerSquare is in the opposite direction of movement
@@ -1011,21 +1019,21 @@ function handlePassengerMove(board, passengerPiece, startRow, startCol, endRow, 
         blackQueenSidePossible, blackKingSidePossible, 
         whiteQueenSidePossible, whiteKingSidePossible
     ];
-    updateCastlingStateAfterMove(passengerPiece, startingCoordinate, endingCoordinate);
-    
-    const newCastlingRights = [
-        blackQueenSidePossible, blackKingSidePossible, 
-        whiteQueenSidePossible, whiteKingSidePossible
-    ];
-    
+    // do NOT update global state for new rights yet. this is updated higher in the call stack
+    const newCastlingRights = updateCastlingStateAfterMove(passengerPiece, startingCoordinate, endingCoordinate);
+
     // Update Zobrist Hash for lost rights (XOR OUT any rights that went from true -> false)
     updateZobristCastling(currentCastlingRights, newCastlingRights);
 
-    return currentHash;
+    return [currentHash, newCastlingRights];
 }
 
 // Cannot move pawns.
 // this might move a king into check or cause a check state, so flag moves should be validated first
+// since this function is called for hypothetical moves
+// we need it to return the updated castling rights for makeMove to update
+// handlePasengerMove will return the updated castling rights
+// which comes from updateCastlingStateAfterMove
 function tryMoveFlagPassenger(board, pieceType, startRow, startCol, endRow, endCol) {
     const passengerDirection = getFlagPassengerDirection(startRow, startCol, endRow, endCol);   
     const passengerSquare = getFlagPassengerSquare(startRow, startCol, passengerDirection);
@@ -1036,14 +1044,16 @@ function tryMoveFlagPassenger(board, pieceType, startRow, startCol, endRow, endC
         if (isEmptySquare(board, ...passengerTargetSquare) 
             && isSameColour(pieceType, passengerPiece) 
             && passengerPiece.toLowerCase() !== "p") {
-            zobristHash = handlePassengerMove(
+            const hashAndCastlingRights = handlePassengerMove(
                 board, 
                 passengerPiece, 
                 ...passengerSquare, 
                 ...passengerTargetSquare
             );
+            return hashAndCastlingRights;
         }
     }
+    return null;
 }
 
 // Cleares the old en passant hash key if it exists
@@ -1094,11 +1104,11 @@ function makeMove(pieceType, startRow, startCol, event) {
         blackQueenSidePossible, blackKingSidePossible, 
         whiteQueenSidePossible, whiteKingSidePossible
     ];
-    updateCastlingStateAfterMove(pieceType, startingSquare, endingSquare);
-    const newCastlingRights = [
+    const newCastlingRights = updateCastlingStateAfterMove(pieceType, startingSquare, endingSquare);
+    [
         blackQueenSidePossible, blackKingSidePossible, 
         whiteQueenSidePossible, whiteKingSidePossible
-    ]
+    ] = newCastlingRights;
     updateZobristCastling(currentCastlingRights, newCastlingRights);
     
     // updateBoard returns the new zobrist hash after the move
@@ -1108,8 +1118,20 @@ function makeMove(pieceType, startRow, startCol, event) {
     // handle flag move specifically
     // move passenger after moving the piece so it is allowed to move into the flag piece's old spot
     if (pieceType.toLowerCase() === "f") {
-        // this will automatically update the zobrist hash for the passenger move as well
-        tryMoveFlagPassenger(boardState, pieceType, startRow, startCol, endRow, endCol);
+        // need to update hash and castling rights outside the tryMoveFlagPassenger function
+        // because it is called in hypothetical board checks, which we don't want to update the global state yet
+        const hashAndCastlingRights = tryMoveFlagPassenger(boardState, pieceType, startRow, startCol, endRow, endCol);
+        // it can be null if no passenger move was made
+        if (hashAndCastlingRights) {
+            zobristHash = hashAndCastlingRights[0];
+            const newCastlingRights = hashAndCastlingRights[1];
+            [
+                blackQueenSidePossible,
+                blackKingSidePossible,
+                whiteQueenSidePossible,
+                whiteKingSidePossible
+            ] = newCastlingRights;
+        }
     }
 
     lastMove.piece = pieceType;
@@ -1172,7 +1194,7 @@ function makeMove(pieceType, startRow, startCol, event) {
     console.log("Current hash:", zobristHash);
     clearIndicators();
     renderBoard(boardState, inCheck, kingRow, kingCol);
-    
+
     savePositionToHistory(); // after hash is fully updated, store the occurence
     console.log(positionHistory);
     detectEndOfGame(); // will check the hash in this function

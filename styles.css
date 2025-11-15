@@ -70,11 +70,19 @@ body {
 }
 
 #game-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: 1fr 0.5fr 0.5fr 0.5fr 0.5fr 1fr;
+    grid-template-areas:
+        "board black-bag"
+        "board black-timer"
+        "board ."
+        "board ."
+        "board white-timer"
+        "board white-bag";
     user-select: none;  
     margin: 5px;
+    column-gap: 20px;
 }
 
 #rules {
@@ -101,17 +109,47 @@ p {
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
     border: 5px solid #333;
+    grid-area: board;
 }
 
 #black-bag, #white-bag {
+    box-sizing: border-box;
     display: flex;
     justify-content: space-evenly;
     align-items: center;
     width: 400px;
     height: 75px;
     border: 5px solid #333;
-    margin-top: 20px;
-    margin-bottom: 20px;
+}
+
+#black-bag {
+    grid-area: black-bag;
+}
+
+#white-bag {
+    grid-area: white-bag;
+    align-self: end;
+}
+
+#black-timer, #white-timer {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100px;
+    height: 50px;
+    font-size: 24px;
+    font-weight: bold;
+    border: 5px solid #333;
+    margin: 0px;
+}
+
+#black-timer {
+    grid-area: black-timer;
+}
+
+#white-timer {
+    grid-area: white-timer;
 }
 
 .green-background {

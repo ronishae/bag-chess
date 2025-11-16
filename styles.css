@@ -76,8 +76,8 @@ body {
     grid-template-areas:
         "board black-bag"
         "board black-timer"
-        "board ."
-        "board ."
+        "board message"
+        "board message"
         "board white-timer"
         "board white-bag";
     user-select: none;  
@@ -131,7 +131,7 @@ p {
     align-self: end;
 }
 
-#black-timer, #white-timer {
+#black-timer, #white-timer, #game-status-message {
     box-sizing: border-box;
     display: flex;
     justify-content: center;
@@ -139,6 +139,9 @@ p {
     height: 50px;
     font-size: 24px;
     font-weight: bold;
+}
+
+#black-timer, #white-timer {
     border: 5px solid #333;
     margin: 0px;
 }
@@ -149,6 +152,11 @@ p {
 
 #white-timer {
     grid-area: white-timer;
+}
+
+#game-status-message {
+    grid-area: message;
+    height: auto;
 }
 
 .green-background {
@@ -214,13 +222,13 @@ p {
     border: none;
     background: none;
     padding: 0;
-    cursor: pointer;
+    cursor: grab;
 }
 
 .move-button {
     border: none;
     background: none;
-    cursor: pointer;
+    cursor: grab;
 }
 
 /* the main target of clicks when making moves */

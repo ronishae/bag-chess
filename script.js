@@ -818,6 +818,16 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
     return filtered;
 }
 
+function endGame() {
+    // disable all piece dragging and clicking
+    const pieces = document.getElementsByClassName("piece-button");
+    for (const piece of pieces) {
+        piece.draggable = false;
+        piece.removeEventListener("click", handlePieceClick);
+        piece.style.cursor = "default";
+    }
+}
+
 function detectEndOfGame() {
     if (checkThreeFoldRepetition()) {
         console.log("Threefold repetition! Game Over.");
@@ -1090,7 +1100,71 @@ function updateZobristCastling(currentRights, newRights) {
     }
 }
 
+// either B or W as input
+function disablePieces(toDisable) {
+    console.log('disabling pieces');
+    if (toDisable !== "B" && toDisable !== "W") {
+        console.error("Invalid colour to disable pieces:", toDisable);
+        return;
+    }
+
+    const pieces = document.getElementsByClassName("piece-button");
+    for (const piece of pieces) {
+        const coordinate = fromCoordinate(piece.parentElement.id);
+        const row = coordinate[0];
+        const col = coordinate[1];
+        const pieceType = boardState[row][col];
+
+        if ((!isBlackPiece(pieceType) && toDisable === "W") ||
+            (isBlackPiece(pieceType) && toDisable === "B")) {
+            
+            // Also disable on the button
+            piece.draggable = false; // Note: You had this, but it's the image that matters most
+            piece.style.cursor = "default";
+            
+            // Remove the click listener
+            piece.removeEventListener("click", handlePieceClick);
+            piece.removeEventListener("dragstart", handleDragStart); // Also remove drag listener
+        }
+    }
+}
+
+function enablePieces(toEnable) {
+    if (toEnable !== "B" && toEnable !== "W") {
+        console.error("Invalid colour to enable pieces:", toEnable);
+        return;
+    }
+    
+    const pieces = document.getElementsByClassName("piece-button");
+    for (const piece of pieces) {
+        const coordinate = fromCoordinate(piece.parentElement.id);
+        const row = coordinate[0];
+        const col = coordinate[1];
+        const pieceType = boardState[row][col];
+        if ((pieceType === pieceType.toUpperCase() && toEnable === "W") ||
+            (pieceType === pieceType.toLowerCase() && toEnable === "B")) {
+            piece.draggable = true;
+            piece.addEventListener("click", handlePieceClick);
+            piece.style.cursor = "grab";
+        }
+    }
+}
+
+
+// call this before the turn changes, so enable the next player's and disable the current player's
+function flipPiecesEnabled() {
+    if (turn === "W") {
+        disablePieces("W");
+        enablePieces("B");
+    } else {
+        disablePieces("B");
+        enablePieces("W");
+    }
+}
+
 function makeMove(pieceType, startRow, startCol, event) {
+    flipPiecesEnabled();
+
     // give grace period for first move for each player
     if (turn === "W" && waitingForWhiteFirstMove) {
         waitingForWhiteFirstMove = false;
@@ -1362,7 +1436,11 @@ function renderBoard(board, check, checkedRow, checkedCol) {
                 button.addEventListener("click", handlePieceClick);
                 button.addEventListener("dragstart", handleDragStart);
             }
-            // TODO: disable / hide button and change cursor otherwise
+            // if not the current player's piece, disable it
+            else {
+                button.draggable = false;
+                button.style.cursor = "default";
+            }
 
             // Indicate check; put inside button so the user can still select the button to move the king
             // Since position is absolute, this does not impace the rendering of the elements
@@ -1576,6 +1654,11 @@ function flipTimer(timer1, timer2) {
     timer2.toggle();
 }
 
+function setMessage(text) {
+    const messageElement = document.getElementById("message-text");
+    messageElement.textContent = text;
+}
+
 function init() {
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -1613,6 +1696,8 @@ function init() {
     const STARTING_TIME_SECONDS = 600; // 10 minutes
     blackTimer = new ChessTimer("black-timer-text", STARTING_TIME_SECONDS);
     whiteTimer = new ChessTimer("white-timer-text", STARTING_TIME_SECONDS);
+    disablePieces("B");
+    enablePieces("W");
     
     renderBoard(boardState);
 }

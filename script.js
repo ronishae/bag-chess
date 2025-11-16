@@ -42,6 +42,8 @@ var blackBag = new Set([...pieceList]);
 var whiteBag = new Set([...pieceList]);
 var whiteTimer = null;
 var blackTimer = null;
+var waitingForWhiteFirstMove = true;
+var waitingForBlackFirstMove = true;
 
 var turn = "W"; // 'W' for White's turn, 'B' for Black
 var zobristHash = 0n;
@@ -1089,7 +1091,18 @@ function updateZobristCastling(currentRights, newRights) {
 }
 
 function makeMove(pieceType, startRow, startCol, event) {
-    flipTimer(blackTimer, whiteTimer);
+    // give grace period for first move for each player
+    if (turn === "W" && waitingForWhiteFirstMove) {
+        waitingForWhiteFirstMove = false;
+    }
+    else if (turn === "B" && waitingForBlackFirstMove) {
+        whiteTimer.start(); // start the white timer after both players made their first move
+        waitingForBlackFirstMove = false;
+    }
+    else if (!waitingForBlackFirstMove && !waitingForWhiteFirstMove) {
+        flipTimer(whiteTimer, blackTimer);
+    }
+
     const parent = event.target.parentElement;
     const startingSquare = toCoordinate(startRow, startCol);
     const endingSquare = parent.id;
@@ -1601,8 +1614,6 @@ function init() {
     blackTimer = new ChessTimer("black-timer-text", STARTING_TIME_SECONDS);
     whiteTimer = new ChessTimer("white-timer-text", STARTING_TIME_SECONDS);
     
-    whiteTimer.start();
-
     renderBoard(boardState);
 }
 

@@ -50,7 +50,7 @@ body {
     margin-bottom: 15px;
 }
 
-/* Don't add bottom margin to the last paragraph in a card */
+/* don't add bottom margin to the last paragraph in a card */
 .rule-card p:last-child {
     margin-bottom: 0;
 }
@@ -62,7 +62,7 @@ body {
 
 #game-container {
     display: grid;
-    grid-template-columns: auto auto;
+    grid-template-columns: 1fr 0.8fr;
     grid-template-rows: 1fr 0.5fr 0.5fr 0.5fr 0.5fr 1fr;
     grid-template-areas:
         "board black-bag"
@@ -94,8 +94,10 @@ p {
 }
 
 #board {
-    width: 400px;
-    height: 400px;
+    width: 100%;
+    max-width: 400px;
+    aspect-ratio: 1 / 1;
+
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
@@ -104,11 +106,9 @@ p {
 }
 
 #black-bag, #white-bag {
-    box-sizing: border-box;
     display: flex;
     justify-content: space-evenly;
     align-items: center;
-    width: 400px;
     height: 75px;
     border: 5px solid #333;
 }
@@ -123,6 +123,7 @@ p {
 }
 
 #black-timer, #white-timer, #game-status-message {
+    width: auto;
     box-sizing: border-box;
     display: flex;
     justify-content: center;
@@ -159,8 +160,9 @@ p {
 }
 
 .bag-image {
-    width: 50px;
-    height: 50px;
+    width: 45px;
+    max-width: 45px;
+    aspect-ratio: 1 / 1;
 }
 
 .square {
@@ -172,8 +174,8 @@ p {
     justify-content: center;
     align-items: center;
 
-    width: 50px;
-    height: 50px;
+    width: 100%;
+    height: 100%;
 }
 
 .light {
@@ -188,7 +190,7 @@ p {
     /* put label in bottom right */
     position: absolute;
     left: 30px;
-    top: 16px;
+    top: 14px;
 
     color: #036b87; 
     font-size: 15px;
@@ -272,4 +274,46 @@ p {
     border: 4px solid #ef4444; /* yellow */
     /* not sure why this indicator specifically needs it. must be something with how the parent-child tree looks */
     box-sizing: border-box; 
+}
+
+
+@media (max-width: 768px) {
+    #game-container {
+        grid-template-columns: 1fr; 
+        grid-template-rows: auto;   
+        
+        grid-template-areas:
+            "black-bag"
+            "black-timer"
+            "board"
+            "message"
+            "white-timer"
+            "white-bag";
+            
+        column-gap: 0;
+        row-gap: 10px;
+        
+        justify-items: center; 
+    }
+
+    #white-bag, #black-bag, #white-timer, #black-timer, #game-status-message, #board {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .bag-image {
+        width: 11vw;      
+        height: 11vw;
+        max-width: 50px;
+        max-height: 50px;
+    }
+
+    .coord-label {
+        font-size: 2.5vw;
+        left: auto;    
+        top: auto;     
+        right: 2px;    
+        bottom: 0px;
+        margin: 0px;
+    }
 }

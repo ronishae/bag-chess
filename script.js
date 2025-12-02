@@ -225,7 +225,6 @@ function savePositionToHistory() {
 
 
 // all the get move functions still need to be validated for checks, pins, can't capture king
-// TODO: still unsure on the exact moves I want
 // for now, a rook that can pass through all units but cannot capture or threaten king
 function getFlagMoves(row, col, pieceType) {
     const directions = [
@@ -877,22 +876,21 @@ function detectEndOfGame() {
     }
 
 
-    // TODO: disable buttons and implement end of game
 
     if (!legalMoveExists) {
          // simple checkmate
         if (inCheck) {
-            console.log("Checkmate! Game Over.");
+            endGame(`Checkmate! ${turn === "W" ? "Black" : "White"} wins.`);
         } 
         // not in check, but no legal moves.
         else {
             if (hasSurvivingPieceWithBagRights) {
                 // they had the *right* to move a piece, but that piece was trapped.
-                console.log("Stalemate! Game Over.");
+                endGame("Stalemate! It's a draw.");
             } else {
                 // they had no legal moves because the bag restricted all their pieces
                 // this is the new bagmate.
-                console.log("Bagmate! Game Over.");
+                endGame(`Bagmate! ${turn === "W" ? "Black" : "White"} wins.`);
             }
         }
     }
@@ -1102,7 +1100,6 @@ function updateZobristCastling(currentRights, newRights) {
 
 // either B or W as input
 function disablePieces(toDisable) {
-    console.log('disabling pieces');
     if (toDisable !== "B" && toDisable !== "W") {
         console.error("Invalid colour to disable pieces:", toDisable);
         return;
@@ -1281,12 +1278,10 @@ function makeMove(pieceType, startRow, startCol, event) {
     
     const inCheck = isInCheck(boardState, turn);
     const [kingRow, kingCol] = locateKing(boardState, turn);
-    console.log("Current hash:", zobristHash);
     clearIndicators();
     renderBoard(boardState, inCheck, kingRow, kingCol);
 
     savePositionToHistory(); // after hash is fully updated, store the occurence
-    console.log(positionHistory);
     detectEndOfGame(); // will check the hash in this function
 }
 
@@ -1583,8 +1578,7 @@ class ChessTimer {
             this.remainingTimeInMs = 0;
             this.updateDisplay();
             this.stop(); // This also clears the animation frame
-            console.log("Time's up!");
-            // TODO: Add game-over logic on timeout
+            endGame(`Timeout! ${turn === "W" ? "Black" : "White"} wins.`);
         } else {
             // Still running
             const newDisplayedSecond = Math.ceil(this.remainingTimeInMs / 1000);
@@ -1654,6 +1648,14 @@ function flipTimer(timer1, timer2) {
     timer2.toggle();
 }
 
+function endGame(message) {
+    setMessage(message);
+    blackTimer.stop();
+    whiteTimer.stop();
+    disablePieces("B");
+    disablePieces("W");
+}
+
 function setMessage(text) {
     const messageElement = document.getElementById("message-text");
     messageElement.textContent = text;
@@ -1691,7 +1693,6 @@ function init() {
         }
     }
     initializeZobristHash();
-    console.log("Init hash:", zobristHash);
 
     const STARTING_TIME_SECONDS = 600; // 10 minutes
     blackTimer = new ChessTimer("black-timer-text", STARTING_TIME_SECONDS);

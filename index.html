@@ -29,10 +29,10 @@
             <img id="white-bag-queen" src="pieces/q.png" class="bag-image" draggable="false" />
             <img id="white-bag-king" src="pieces/k.png" class="bag-image" draggable="false" />
         </div>
-        <div id ="white-timer">
+        <div id="white-timer">
             <span id="white-timer-text"></span>
         </div>
-        <div id ="game-status-message">
+        <div id="game-status-message">
             <span id="message-text">Welcome!</span>
         </div>
     </div>
@@ -40,7 +40,6 @@
     <section id="rules">
         <h1>Bag Chess Rules</h1>
 
-        <!-- Rule 1: The Move Bag -->
         <section class="rule-card">
             <h2>1. Move Bag</h2>
             <p>
@@ -57,7 +56,6 @@
             </p>
         </section>
 
-        <!-- Rule 2: The Flag Bearer -->
         <section class="rule-card">
             <h2>2. New Piece: Flag Bearer</h2>
             <p>
@@ -73,7 +71,7 @@
                 The flag bearer is <b>exempt from the bag rule</b>, and can be moved regardless of the bag's state.
             </p>
             
-            <p class="highlight-text">
+            <p>
                 <b>The flag bearer will move a passenger with it when it moves.</b>
                 The passenger is the friendly piece immediately behind 
                 (opposite to the direction of movement) the flag bearer.
@@ -94,32 +92,22 @@
             </p>
         </section>
 
-        <!-- Rule 3: Bag-Mate -->
         <section class="rule-card">
             <h2>3. New Win Condition: "Bagmate"</h2>
             <p> This is a special win condition for this variant! 
                 <b>You win if it is your opponent's turn and they have no legal moves 
                 because none of their surviving pieces have bag move rights.</b>
                 This occurs when you capture the last remaining piece 
-                type with available moves in their bag. 
+                type with available moves in their bag (and their flag bearers cannot move
+                or are captured). 
             </p>
             <p>
-                How it works: Your opponent may still have pieces on the board (like a King and a Bishop), 
-                but if they have already used their "King move" and "Bishop move" rights, 
-                their bag is empty for those pieces. 
-                
-                If their Flag Bearer also has no moves (e.g. both are captured), 
-                they are "stranded" -- no legal moves.
-            </p>
-            <p class="highlight-text">
-                <b>This is not a draw!</b> 
-                They failed to manage their move bag. 
-                This is a win for you.
+                Stalemate still exists. If the opponent has no legal moves, but at least one of
+                their surviving pieces has bag move rights (or is a flag bearer), then the game is a draw.
             </p>
         </section>
 
-        <!-- Clarifications -->
-        <section class="rule-card clarification">
+        <section class="rule-card">
             <h2>Clarifications</h2>
             <p>
                 Even if a piece cannot move because it is not in the move bag, it is still able to give check / checkmate.

@@ -2,7 +2,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-family: 'Inter', "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Times New Roman', Times, serif;
     background-color: #f4f7f6;
     color: #3d3d3d;
     line-height: 1.6;
@@ -22,7 +22,10 @@ body {
     margin-bottom: 30px;
 }
 
-/* --- Rule Card Styling --- */
+#game-status-message {
+    color: #036b87;
+}
+
 .rule-card {
     background-color: #ffffff;
     border: 1px solid #e0e0e0;
@@ -52,21 +55,9 @@ body {
     margin-bottom: 0;
 }
 
-/* --- Highlighting --- */
 .rule-card b {
     color: #c0392b;
     font-weight: 600;
-}
-
-.highlight-text {
-    background-color: #fffedf;
-    padding: 10px 15px;
-    border-radius: 8px;
-}
-
-/* make clarifications gray to not stand out */
-.clarification h2 {
-    color: #5d6d7e;
 }
 
 #game-container {

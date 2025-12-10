@@ -1,3 +1,16 @@
+import { db } from "./firebase.js";
+import { 
+    doc, 
+    getDoc, 
+    setDoc, 
+    updateDoc, 
+    onSnapshot, 
+    deleteDoc, 
+    arrayUnion,
+    serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
 const SIZE = 8;
 
 // do not change this; use for final implementation
@@ -25,7 +38,7 @@ const testBoard = [
 ];
 
 // set this to INIT or testBoard as needed
-const boardState = INIT;
+var boardState = INIT;
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
     f: "flag",
@@ -73,6 +86,318 @@ var whiteKingSidePossible = true;
 var lastClickedPieceLocation = null;
 // [piece, endCoordinate]
 var lastMove = {};
+
+// CONVERTS: 2D Array (Game) -> Object (Database)
+function packBoardForDB(boardArray) {
+    const boardObj = {};
+    boardArray.forEach((row, index) => {
+        // We use the string "0", "1", "2" as keys
+        boardObj[index.toString()] = row; 
+    });
+    return boardObj;
+}
+
+// CONVERTS: Object (Database) -> 2D Array (Game)
+function unpackBoardFromDB(boardObj) {
+    const boardArray = [];
+    // We assume standard chess size of 8 rows
+    for (let i = 0; i < 8; i++) {
+        // If the row is missing (error case), return an empty row
+        boardArray.push(boardObj[i.toString()] || Array(8).fill("."));
+    }
+    return boardArray;
+}
+
+var currentGameId = null;
+
+// A helper to generate the starting state for the DB
+function getInitialGameState() {
+    return {
+        created_at: Date.now(),
+
+        board: packBoardForDB(INIT), 
+        
+        turn: "W",
+        status: "waiting",
+        winner: null,
+        
+        castling: {
+            w_king: true, // whiteKingSidePossible
+            w_queen: true, // whiteQueenSidePossible
+            b_king: true,
+            b_queen: true
+        },
+
+        bags: {
+            white: ["p", "r", "n", "b", "q", "k"], // Array.from(whiteBag)
+            black: ["p", "r", "n", "b", "q", "k"]
+        },
+        
+        // TODO timers should store time remaining in DB
+        timers: {
+            white: 600, // e.g., 10 minutes
+            black: 600,
+            lastMoveTimestamp: null // Needed to calculate elapsed time
+        },
+
+        // 6. Zobrist & History
+        // BigInt must be a string. Map must be an Object/JSON string.
+        zobristHash: "0", 
+        zobristEnPassant: -1,
+        positionHistory: {}, // Object, not Map
+        
+        lastMove: null 
+    };
+}
+
+function getCurrentGameStateForDB() {
+    return {
+        board: packBoardForDB(boardState),
+        turn: turn,
+        castling: {
+            w_king: whiteKingSidePossible,
+            w_queen: whiteQueenSidePossible,
+            b_king: blackKingSidePossible,
+            b_queen: blackQueenSidePossible
+        },
+        bags: {
+            white: Array.from(whiteBag),
+            black: Array.from(blackBag)
+        },
+        zobristHash: zobristHash.toString(),
+        zobristEnPassant: zobristEnPassant,
+        
+        positionHistory: Object.fromEntries(positionHistory), 
+        lastMove: lastMove,
+        timers: {
+            white: 600, 
+            black: 600,
+            lastMoveTimestamp: Date.now()
+        }
+    };
+}
+
+function generateRandomId(length) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+async function checkAuth() {
+    const auth = getAuth();
+    if (!auth.currentUser) {
+        console.log("Signing in anonymously...");
+        await signInAnonymously(auth);
+    }
+}
+
+async function createRoom() {
+    await checkAuth();
+    
+    let isUnique = false;
+    let gameId = "";
+    let attempts = 0;
+
+    // give 10 tries for a unique room code
+    // later can make it better
+    while (!isUnique && attempts < 10) {
+        gameId = generateRandomId(4);
+        attempts++;
+
+        const gameRef = doc(db, 'games', gameId);
+
+        const snapshot = await getDoc(gameRef);
+        const initialState = getInitialGameState();
+        if (!snapshot.exists()) {
+            isUnique = true;
+            await setDoc(doc(db, "games", gameId), initialState);
+            console.log(`Success! Created room: ${gameId}`);
+        }
+    }
+    
+    if (!isUnique) console.error("Could not find a unique ID after 10 tries.");
+    
+    return gameId;
+}
+
+document.getElementById("create-game-button").addEventListener("click", async () => {
+    const gameId = await createRoom();
+    setupGameListener();
+    alert(`Game created! Your game code is: ${gameId}`);
+});
+
+const joinBtn = document.getElementById("join-game-button");
+const codeInput = document.getElementById("game-code-input");
+
+function setLocalVariables(roomData) {
+    if (!roomData) {
+        console.error("No room data provided to setLocalVariables");
+        return;
+    }
+
+    // 1. Board: Unpack the object back into a 2D array
+    if (roomData.board) {
+        boardState = unpackBoardFromDB(roomData.board);
+    }
+
+    // 2. Simple Primitive Types (Strings, Numbers, Booleans)
+    if (roomData.turn) turn = roomData.turn;
+    
+    // 3. Castling Rights (Map the object back to your individual variables)
+    if (roomData.castling) {
+        whiteKingSidePossible = roomData.castling.w_king;
+        whiteQueenSidePossible = roomData.castling.w_queen;
+        blackKingSidePossible = roomData.castling.b_king;
+        blackQueenSidePossible = roomData.castling.b_queen;
+    }
+
+    // 4. Bags: Convert Arrays back to Sets
+    // Firestore stores them as ["p", "r"], but your logic needs new Set(["p", "r"])
+    if (roomData.bags) {
+        whiteBag = new Set(roomData.bags.white || []);
+        blackBag = new Set(roomData.bags.black || []);
+    }
+
+    // 5. Zobrist Hash: Convert String back to BigInt
+    // JSON cannot store BigInts (e.g., 1234n), so we stored them as strings "1234"
+    if (roomData.zobristHash) {
+        zobristHash = BigInt(roomData.zobristHash);
+    }
+
+    if (roomData.zobristEnPassant !== undefined) {
+        zobristEnPassant = roomData.zobristEnPassant;
+    }
+
+    // 6. Position History: Convert Object back to Map
+    // Firestore stored it as { "1234": 1 }, logic needs Map { 1234n => 1 }
+    if (roomData.positionHistory) {
+        positionHistory = new Map();
+        for (const [hashStr, count] of Object.entries(roomData.positionHistory)) {
+            // We must convert the key string back to BigInt to match your hash logic
+            positionHistory.set(BigInt(hashStr), count);
+        }
+    }
+
+    // 7. Last Move
+    if (roomData.lastMove) {
+        lastMove = roomData.lastMove;
+        
+        // OPTIONAL: Update "waiting for first move" flags based on game state
+        // If a move has been made, we are clearly not waiting for the very first move
+        waitingForWhiteFirstMove = false; 
+        waitingForBlackFirstMove = false;
+    } else {
+        // If lastMove is null, it's a fresh game
+        waitingForWhiteFirstMove = true;
+        waitingForBlackFirstMove = true;
+    }
+
+    // 8. Timers
+    // NOTE: We do NOT set 'whiteTimer' or 'blackTimer' here directly.
+    // In your code, those variables likely hold the 'setInterval' IDs (integers), not the time remaining.
+    // You should probably update the UI display here, but not the interval ID variables.
+    // Example:
+    // if (roomData.timers) {
+    //     updateTimerDisplay(roomData.timers.white, roomData.timers.black);
+    // }
+    
+    console.log("Local variables synced with DB!");
+}
+
+let unsubscribeFromGame = null; // We store this so we can stop listening later
+
+function setupGameListener() {
+    if (!currentGameId) {
+        console.error("No game ID found to listen to.");
+        return;
+    }
+
+    // 1. If we are already listening to a game, detach the old listener
+    // if (unsubscribeFromGame) {
+    //     unsubscribeFromGame();
+    // }
+
+    console.log(`Listening for updates on room: ${currentGameId}...`);
+    const gameRef = doc(db, "games", currentGameId);
+
+    // 2. Start the Real-Time Listener
+    unsubscribeFromGame = onSnapshot(gameRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const roomData = docSnap.data();
+            
+            console.log("Database update received!");
+            syncUIDB(roomData);
+        } else {
+            console.log("Game room deleted or does not exist.");
+            // Handle game over / room closed logic here
+        }
+    });
+}
+
+function syncUIDB (roomData) {
+    setLocalVariables(roomData);
+    clearIndicators();
+    renderBoard(boardState);
+    if (roomData.turn === "W") {
+        var bagToHighlight = document.getElementById("white-bag");
+        var bagToUnhighlight = document.getElementById("black-bag");
+    } else {
+        var bagToHighlight = document.getElementById("black-bag");
+        var bagToUnhighlight = document.getElementById("white-bag");
+    }
+    bagToHighlight.classList.add("green-background");
+    bagToUnhighlight.classList.remove("green-background");
+    renderBags();
+}
+
+joinBtn.addEventListener("click", async () => {
+    await checkAuth();
+    const enteredCode = codeInput.value.trim().toUpperCase();
+    console.log(enteredCode);
+    if (!enteredCode) {
+        alert("Please enter a game code!");
+        return;
+    }
+
+    console.log(`Attempting to join room: ${enteredCode}...`);
+
+    try {
+        const roomRef = doc(db, "games", enteredCode);
+
+        const roomSnap = await getDoc(roomRef);
+
+        if (roomSnap.exists()) {
+            currentGameId = enteredCode;
+            
+            const roomData = roomSnap.data();
+
+            console.log("Successfully joined room:", currentGameId);
+            console.log("Current Room Data:", roomData.board);
+            setupGameListener();
+            syncUIDB(roomData);
+
+            alert(`Joined Room ${currentGameId}!`);
+        } else {
+            currentGameId = null;
+            console.log("Room not found.");
+            alert("Room not found. Please check the code.");
+        }
+
+    } catch (error) {
+        console.error("Error joining room:", error);
+        currentGameId = null;
+    }
+});
+
+
+
+
+
+
+
 
 const board = document.getElementById("board");
 function toLetter(num) {
@@ -304,8 +629,8 @@ function getPawnMoves(row, col, pieceType) {
 
     const [lastMoveRow, lastMoveCol] = fromCoordinate(lastMove.endCoordinate);
     // en passant
-    ROW_WHITE_CAN_EN_PASSANT = 3
-    ROW_BLACK_CAN_EN_PASSANT = 4
+    const ROW_WHITE_CAN_EN_PASSANT = 3
+    const ROW_BLACK_CAN_EN_PASSANT = 4
     if ((ROW_WHITE_CAN_EN_PASSANT === row && pieceType === "P" ||
         ROW_BLACK_CAN_EN_PASSANT === row && pieceType === "p")
     ) {
@@ -875,22 +1200,20 @@ function detectEndOfGame() {
         }
     }
 
-
-
     if (!legalMoveExists) {
          // simple checkmate
         if (inCheck) {
-            endGame(`Checkmate! ${turn === "W" ? "Black" : "White"} wins.`);
+            endGameUI(`Checkmate! ${turn === "W" ? "Black" : "White"} wins.`);
         } 
         // not in check, but no legal moves.
         else {
             if (hasSurvivingPieceWithBagRights) {
                 // they had the *right* to move a piece, but that piece was trapped.
-                endGame("Stalemate! It's a draw.");
+                endGameUI("Stalemate! It's a draw.");
             } else {
                 // they had no legal moves because the bag restricted all their pieces
                 // this is the new bagmate.
-                endGame(`Bagmate! ${turn === "W" ? "Black" : "White"} wins.`);
+                endGameUI(`Bagmate! ${turn === "W" ? "Black" : "White"} wins.`);
             }
         }
     }
@@ -1159,7 +1482,7 @@ function flipPiecesEnabled() {
     }
 }
 
-function makeMove(pieceType, startRow, startCol, event) {
+async function makeMove(pieceType, startRow, startCol, event) {
     flipPiecesEnabled();
 
     // give grace period for first move for each player
@@ -1226,12 +1549,8 @@ function makeMove(pieceType, startRow, startCol, event) {
 
     if (turn === "W") {
         var bagToUse = whiteBag;
-        var bagToUnhighlight = document.getElementById("white-bag");
-        var bagToHighlight = document.getElementById("black-bag");
     } else {
         bagToUse = blackBag;
-        var bagToUnhighlight = document.getElementById("black-bag");
-        var bagToHighlight = document.getElementById("white-bag");
     }
     bagToUse.delete(pieceType.toLowerCase());
     // toggle bag move rights for the piece in the zobrist hash
@@ -1265,8 +1584,6 @@ function makeMove(pieceType, startRow, startCol, event) {
     }
 
     renderBags();
-    bagToHighlight.classList.add("green-background");
-    bagToUnhighlight.classList.remove("green-background");
 
     if (turn === "W") {
         turn = "B";
@@ -1276,10 +1593,20 @@ function makeMove(pieceType, startRow, startCol, event) {
     // toggle turn in zobrist hash
     zobristHash ^= zobristKeys.side;
     
-    const inCheck = isInCheck(boardState, turn);
-    const [kingRow, kingCol] = locateKing(boardState, turn);
     clearIndicators();
-    renderBoard(boardState, inCheck, kingRow, kingCol);
+    renderBoard(boardState);
+
+    if (currentGameId) {
+        const gameRef = doc(db, "games", currentGameId);
+        
+        // Prepare the packet
+        const newState = getCurrentGameStateForDB();
+        
+        // Send to Firebase
+        // Note: We use updateDoc (not setDoc) to avoid overwriting fields we didn't include
+        await updateDoc(gameRef, newState);
+        console.log("Move sent to database!");
+    }
 
     savePositionToHistory(); // after hash is fully updated, store the occurence
     detectEndOfGame(); // will check the hash in this function
@@ -1409,10 +1736,12 @@ function handleDrop(event) {
     }
 }
 
-function renderBoard(board, check, checkedRow, checkedCol) {
+function renderBoard(board) {
     // clear board to prevent id duplication
     removeElementsByClass("piece-image");
     removeElementsByClass("piece-button");
+    const check = isInCheck(boardState, turn);
+    const [checkedRow, checkedCol] = locateKing(boardState, turn);
 
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -1578,7 +1907,7 @@ class ChessTimer {
             this.remainingTimeInMs = 0;
             this.updateDisplay();
             this.stop(); // This also clears the animation frame
-            endGame(`Timeout! ${turn === "W" ? "Black" : "White"} wins.`);
+            endGameUI(`Timeout! ${turn === "W" ? "Black" : "White"} wins.`);
         } else {
             // Still running
             const newDisplayedSecond = Math.ceil(this.remainingTimeInMs / 1000);
@@ -1648,7 +1977,7 @@ function flipTimer(timer1, timer2) {
     timer2.toggle();
 }
 
-function endGame(message) {
+function endGameUI(message) {
     setMessage(message);
     blackTimer.stop();
     whiteTimer.stop();

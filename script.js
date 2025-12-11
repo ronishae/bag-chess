@@ -1,3 +1,16 @@
+import { db } from "./firebase.js";
+import { 
+    doc, 
+    getDoc, 
+    setDoc, 
+    updateDoc, 
+    onSnapshot, 
+    deleteDoc, 
+    arrayUnion,
+    serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
 const SIZE = 8;
 
 // do not change this; use for final implementation
@@ -25,7 +38,7 @@ const testBoard = [
 ];
 
 // set this to INIT or testBoard as needed
-const boardState = INIT;
+var boardState = structuredClone(INIT);
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
     f: "flag",
@@ -74,6 +87,335 @@ var lastClickedPieceLocation = null;
 // [piece, endCoordinate]
 var lastMove = {};
 
+// 2D Array (Game) -> Object (Database)
+function packBoardForDB(boardArray) {
+    const boardObj = {};
+    boardArray.forEach((row, index) => {
+        // We use the string "0", "1", "2" as keys
+        boardObj[index.toString()] = row; 
+    });
+    return boardObj;
+}
+
+// Object (Database) -> 2D Array (Game)
+function unpackBoardFromDB(boardObj) {
+    const boardArray = [];
+    for (let i = 0; i < 8; i++) {
+        // If the row is missing (error case), return an empty row
+        boardArray.push(boardObj[i.toString()] || Array(8).fill("."));
+    }
+    return boardArray;
+}
+
+var currentGameId = null;
+
+function getInitialGameState() {
+    return {
+        created_at: Date.now(),
+
+        board: packBoardForDB(INIT), 
+        
+        turn: "W",
+        status: "waiting",
+        winner: null,
+        
+        castling: {
+            w_king: true, // whiteKingSidePossible
+            w_queen: true, // whiteQueenSidePossible
+            b_king: true,
+            b_queen: true
+        },
+
+        bags: {
+            white: ["p", "r", "n", "b", "q", "k"], // Array.from(whiteBag)
+            black: ["p", "r", "n", "b", "q", "k"]
+        },
+        
+        timers: {
+            white: 600 * 1000,
+            black: 600 * 1000,
+            lastMoveTimestamp: null, // Needed to calculate elapsed time
+            isWhite: true,
+            isBlack: false,
+            waitingForWhiteFirstMove: true,
+            waitingForBlackFirstMove: true,
+        },
+
+        // 6. Zobrist & History
+        // BigInt must be a string. Map must be an Object/JSON string.
+        zobristHash: "0", 
+        zobristEnPassant: -1,
+        positionHistory: {}, // Object, not Map
+        
+        lastMove: null 
+    };
+}
+
+function getCurrentGameStateForDB() {
+    return {
+        board: packBoardForDB(boardState),
+        turn: turn,
+        castling: {
+            w_king: whiteKingSidePossible,
+            w_queen: whiteQueenSidePossible,
+            b_king: blackKingSidePossible,
+            b_queen: blackQueenSidePossible
+        },
+        bags: {
+            white: Array.from(whiteBag),
+            black: Array.from(blackBag)
+        },
+        zobristHash: zobristHash.toString(),
+        zobristEnPassant: zobristEnPassant,
+        
+        positionHistory: Object.fromEntries(positionHistory), 
+        lastMove: lastMove,
+        timers: {
+            white: whiteTimer.remainingTimeInMs, 
+            black: blackTimer.remainingTimeInMs,
+            lastMoveTimestamp: Date.now(),
+            isWhite: turn == "W",
+            isBlack: turn == "B",
+            waitingForWhiteFirstMove: waitingForWhiteFirstMove,
+            waitingForBlackFirstMove: waitingForBlackFirstMove
+        }
+    };
+}
+
+function generateRandomId(length) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+async function checkAuth() {
+    const auth = getAuth();
+    if (!auth.currentUser) {
+        console.log("Signing in anonymously...");
+        await signInAnonymously(auth);
+    }
+}
+
+const joinBtn = document.getElementById("join-game-button");
+const codeInput = document.getElementById("game-code-input");
+
+async function createRoom() {
+    await checkAuth();
+    
+    let isUnique = false;
+    let gameId = "";
+    let attempts = 0;
+
+    // give 10 tries for a unique room code
+    // later can make it better
+    while (!isUnique && attempts < 10) {
+        gameId = generateRandomId(4);
+        currentGameId = gameId;
+        attempts++;
+
+        const gameRef = doc(db, 'games', gameId);
+
+        const snapshot = await getDoc(gameRef);
+        const initialState = getInitialGameState();
+        if (!snapshot.exists()) {
+            isUnique = true;
+            await setDoc(doc(db, "games", gameId), initialState);
+            codeInput.value = gameId;
+            syncUIDB(initialState); 
+            console.log(`Success! Created room: ${gameId}`);
+        }
+    
+        setupGameListener();
+    }
+    
+    if (!isUnique) console.error("Could not find a unique ID after 10 tries.");
+    
+    return gameId;
+}
+
+document.getElementById("create-game-button").addEventListener("click", async () => {
+    const gameId = await createRoom();
+    alert(`Game created! Your game code is: ${gameId}`);
+});
+
+
+
+function setLocalVariables(roomData) {
+    if (!roomData) {
+        console.error("No room data provided to setLocalVariables");
+        return;
+    }
+
+    if (roomData.board) {
+        boardState = unpackBoardFromDB(roomData.board);
+    }
+
+    if (roomData.turn) turn = roomData.turn;
+    
+    if (roomData.castling) {
+        whiteKingSidePossible = roomData.castling.w_king;
+        whiteQueenSidePossible = roomData.castling.w_queen;
+        blackKingSidePossible = roomData.castling.b_king;
+        blackQueenSidePossible = roomData.castling.b_queen;
+    }
+
+    // Convert Arrays back to Sets
+    if (roomData.bags) {
+        whiteBag = new Set(roomData.bags.white || []);
+        blackBag = new Set(roomData.bags.black || []);
+    }
+
+    // Convert String back to BigInt
+    if (roomData.zobristHash) {
+        zobristHash = BigInt(roomData.zobristHash);
+    }
+
+    if (roomData.zobristEnPassant !== undefined) {
+        zobristEnPassant = roomData.zobristEnPassant;
+    }
+
+    // Convert Object back to Map
+    // DB stored it as { "1234": 1 }, logic needs Map { 1234n => 1 }
+    if (roomData.positionHistory) {
+        positionHistory = new Map();
+        for (const [hashStr, count] of Object.entries(roomData.positionHistory)) {
+            positionHistory.set(BigInt(hashStr), count);
+        }
+    }
+
+    if (roomData.lastMove) {
+        lastMove = roomData.lastMove;
+    } 
+
+    if (roomData.timers) {
+        const now = Date.now();
+        waitingForWhiteFirstMove = roomData.timers.waitingForWhiteFirstMove;
+        waitingForBlackFirstMove = roomData.timers.waitingForBlackFirstMove;
+        let serverWhiteTime = roomData.timers.white;
+        let serverBlackTime = roomData.timers.black;
+        const lastTimestamp = roomData.timers.lastMoveTimestamp;
+
+        // only calculate elapsed time if the game has actually started
+        if (lastTimestamp && !roomData.timers.waitingForWhiteFirstMove) {
+            
+            const elapsedMs = now - lastTimestamp;
+            if (roomData.turn === "W") {
+                serverWhiteTime -= elapsedMs;
+            } else {
+                serverBlackTime -= elapsedMs;
+            }
+        }
+
+        whiteTimer.setTime(serverWhiteTime);
+        blackTimer.setTime(serverBlackTime);
+        // stop to ensure if this is called on create game, any current timers are stopped
+        whiteTimer.stop();
+        blackTimer.stop();
+        whiteTimer.updateDisplay();
+        blackTimer.updateDisplay();
+
+        // set the correct timer to ticking
+        if (roomData.turn === "W" && !waitingForWhiteFirstMove) {
+            whiteTimer.start();
+            blackTimer.stop();
+        } else if (roomData.turn === "B" && !waitingForBlackFirstMove) {
+            whiteTimer.stop();
+            blackTimer.start();
+        }
+    }
+    
+    console.log("Local variables synced with DB!");
+}
+
+
+// TODO: might need ome extra logic to unsubscribe, not sure
+function setupGameListener() {
+    if (!currentGameId) {
+        console.error("No game ID found to listen to.");
+        return;
+    }
+
+    console.log(`Listening for updates on room: ${currentGameId}...`);
+    const gameRef = doc(db, "games", currentGameId);
+
+    onSnapshot(gameRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const roomData = docSnap.data();
+            
+            console.log("Database update received!");
+            syncUIDB(roomData);
+        } else {
+            console.log("Game room deleted or does not exist.");
+            // Handle game over / room closed logic here
+        }
+    });
+}
+
+function syncUIDB (roomData) {
+    setLocalVariables(roomData);
+    clearIndicators();
+    renderBoard(boardState);
+    if (roomData.turn === "W") {
+        var bagToHighlight = document.getElementById("white-bag");
+        var bagToUnhighlight = document.getElementById("black-bag");
+    } else {
+        var bagToHighlight = document.getElementById("black-bag");
+        var bagToUnhighlight = document.getElementById("white-bag");
+    }
+    bagToHighlight.classList.add("green-background");
+    bagToUnhighlight.classList.remove("green-background");
+    renderBags();
+}
+
+joinBtn.addEventListener("click", async () => {
+    await checkAuth();
+    const enteredCode = codeInput.value.trim().toUpperCase();
+    console.log(enteredCode);
+    if (!enteredCode) {
+        alert("Please enter a game code!");
+        return;
+    }
+
+    console.log(`Attempting to join room: ${enteredCode}...`);
+
+    try {
+        const roomRef = doc(db, "games", enteredCode);
+
+        const roomSnap = await getDoc(roomRef);
+
+        if (roomSnap.exists()) {
+            currentGameId = enteredCode;
+            
+            const roomData = roomSnap.data();
+
+            setupGameListener();
+            syncUIDB(roomData);
+            whiteTimer.stop();
+            blackTimer.stop();
+
+            alert(`Joined Room ${currentGameId}!`);
+        } else {
+            currentGameId = null;
+            console.log("Room not found.");
+            alert("Room not found. Please check the code.");
+        }
+
+    } catch (error) {
+        console.error("Error joining room:", error);
+        currentGameId = null;
+    }
+});
+
+
+
+
+
+
+
+
 const board = document.getElementById("board");
 function toLetter(num) {
     return String.fromCharCode("a".charCodeAt(0) + num);
@@ -95,12 +437,10 @@ function pieceFromCoordinate(coord) {
 }
 
 function removeElementsByClass(className) {
-    // 1. Select all matching elements
     const elements = document.querySelectorAll(`.${className}`);
 
-    // 2. Iterate and remove each element
-    // Note: The NodeList returned by querySelectorAll is static, so removing elements
-    // while iterating is safe.
+    // returned of querySelectorAll is static, so removing elements
+    // while iterating is safe
     elements.forEach((element) => {
         element.remove();
     });
@@ -141,9 +481,9 @@ function convertMoves(moves) {
     return moves.map(([r, c]) => toCoordinate(r, c));
 }
 
-// Function to generate a random 64-bit BigInt
+// generate a random 64-bit BigInt
 function generateRandomBigInt() {
-    // Generate four 16-bit numbers and combine them
+    // generate four 16-bit numbers and combine them
     const p1 = BigInt(Math.floor(Math.random() * 65536));
     const p2 = BigInt(Math.floor(Math.random() * 65536));
     const p3 = BigInt(Math.floor(Math.random() * 65536));
@@ -161,14 +501,14 @@ const NUM_SQUARES = 64;
 
 function initializeZobristKeys() {
     const keys = {
-        // Piece keys are now accessed by character and [row][col] index.
-        // Piece characters: P, N, B, R, Q, K, F (White) and p, n, b, r, q, k, f (Black)
+        // piece keys are now accessed by character and [row][col] index.
+        // piece characters: P, N, B, R, Q, K, F (White) and p, n, b, r, q, k, f (Black)
         pieces: {},
 
-        // Side to move (only one key for 'b' to toggle from 'w')
+        // side to move (only one key for 'b' to toggle from 'w')
         side: generateRandomBigInt(),
 
-        // Castling rights (4 keys for KQkq)
+        // castling rights (4 keys for KQkq)
         castling: {
             'K': generateRandomBigInt(), // White Kingside
             'Q': generateRandomBigInt(), // White Queenside
@@ -176,7 +516,7 @@ function initializeZobristKeys() {
             'q': generateRandomBigInt(), // Black Queenside
         },
 
-        // En Passant target files (8 keys for files a-h, or 0-7)
+        // en passant target files (8 keys for files a-h, or 0-7)
         enPassant: Array(8).fill(0).map(() => generateRandomBigInt()),
         bag: {},
     };
@@ -204,11 +544,11 @@ function initializeZobristKeys() {
 const zobristKeys = initializeZobristKeys();
 
 function checkThreeFoldRepetition() {
-    // Convert BigInt key to string for reliable Map lookup
+    // convert BigInt key to string for reliable Map lookup
     const hashString = zobristHash.toString();
     const count = positionHistory.get(hashString) || 0;
     
-    // If the hash has been seen twice before, the current position is the third instance.
+    // if the hash has been seen twice before, the current position is the third instance.
     return count >= 2; 
 }
 
@@ -304,8 +644,8 @@ function getPawnMoves(row, col, pieceType) {
 
     const [lastMoveRow, lastMoveCol] = fromCoordinate(lastMove.endCoordinate);
     // en passant
-    ROW_WHITE_CAN_EN_PASSANT = 3
-    ROW_BLACK_CAN_EN_PASSANT = 4
+    const ROW_WHITE_CAN_EN_PASSANT = 3
+    const ROW_BLACK_CAN_EN_PASSANT = 4
     if ((ROW_WHITE_CAN_EN_PASSANT === row && pieceType === "P" ||
         ROW_BLACK_CAN_EN_PASSANT === row && pieceType === "p")
     ) {
@@ -875,22 +1215,20 @@ function detectEndOfGame() {
         }
     }
 
-
-
     if (!legalMoveExists) {
          // simple checkmate
         if (inCheck) {
-            endGame(`Checkmate! ${turn === "W" ? "Black" : "White"} wins.`);
+            endGameUI(`Checkmate! ${turn === "W" ? "Black" : "White"} wins.`);
         } 
         // not in check, but no legal moves.
         else {
             if (hasSurvivingPieceWithBagRights) {
                 // they had the *right* to move a piece, but that piece was trapped.
-                endGame("Stalemate! It's a draw.");
+                endGameUI("Stalemate! It's a draw.");
             } else {
                 // they had no legal moves because the bag restricted all their pieces
                 // this is the new bagmate.
-                endGame(`Bagmate! ${turn === "W" ? "Black" : "White"} wins.`);
+                endGameUI(`Bagmate! ${turn === "W" ? "Black" : "White"} wins.`);
             }
         }
     }
@@ -1159,7 +1497,7 @@ function flipPiecesEnabled() {
     }
 }
 
-function makeMove(pieceType, startRow, startCol, event) {
+async function makeMove(pieceType, startRow, startCol, event) {
     flipPiecesEnabled();
 
     // give grace period for first move for each player
@@ -1226,12 +1564,8 @@ function makeMove(pieceType, startRow, startCol, event) {
 
     if (turn === "W") {
         var bagToUse = whiteBag;
-        var bagToUnhighlight = document.getElementById("white-bag");
-        var bagToHighlight = document.getElementById("black-bag");
     } else {
         bagToUse = blackBag;
-        var bagToUnhighlight = document.getElementById("black-bag");
-        var bagToHighlight = document.getElementById("white-bag");
     }
     bagToUse.delete(pieceType.toLowerCase());
     // toggle bag move rights for the piece in the zobrist hash
@@ -1265,8 +1599,6 @@ function makeMove(pieceType, startRow, startCol, event) {
     }
 
     renderBags();
-    bagToHighlight.classList.add("green-background");
-    bagToUnhighlight.classList.remove("green-background");
 
     if (turn === "W") {
         turn = "B";
@@ -1276,10 +1608,30 @@ function makeMove(pieceType, startRow, startCol, event) {
     // toggle turn in zobrist hash
     zobristHash ^= zobristKeys.side;
     
-    const inCheck = isInCheck(boardState, turn);
-    const [kingRow, kingCol] = locateKing(boardState, turn);
+    if (turn === "W") {
+        var bagToHighlight = document.getElementById("white-bag");
+        var bagToUnhighlight = document.getElementById("black-bag");
+    } else {
+        var bagToHighlight = document.getElementById("black-bag");
+        var bagToUnhighlight = document.getElementById("white-bag");
+    }
+    bagToHighlight.classList.add("green-background");
+    bagToUnhighlight.classList.remove("green-background");
+
     clearIndicators();
-    renderBoard(boardState, inCheck, kingRow, kingCol);
+    renderBoard(boardState);
+
+    if (currentGameId) {
+        const gameRef = doc(db, "games", currentGameId);
+        
+        // Prepare the packet
+        const newState = getCurrentGameStateForDB();
+        
+        // Send to Firebase
+        // Note: We use updateDoc (not setDoc) to avoid overwriting fields we didn't include
+        await updateDoc(gameRef, newState);
+        console.log("Move sent to database!");
+    }
 
     savePositionToHistory(); // after hash is fully updated, store the occurence
     detectEndOfGame(); // will check the hash in this function
@@ -1409,10 +1761,12 @@ function handleDrop(event) {
     }
 }
 
-function renderBoard(board, check, checkedRow, checkedCol) {
+function renderBoard(board) {
     // clear board to prevent id duplication
     removeElementsByClass("piece-image");
     removeElementsByClass("piece-button");
+    const check = isInCheck(boardState, turn);
+    const [checkedRow, checkedCol] = locateKing(boardState, turn);
 
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
@@ -1517,6 +1871,10 @@ class ChessTimer {
         this.updateDisplay(); // Show initial time
     }
 
+    setTime(timeInMs) {
+        this.remainingTimeInMs = Math.max(0, timeInMs);
+        this.updateDisplay();
+    }
 
     /**
      * Updates the timer's HTML element.
@@ -1578,7 +1936,7 @@ class ChessTimer {
             this.remainingTimeInMs = 0;
             this.updateDisplay();
             this.stop(); // This also clears the animation frame
-            endGame(`Timeout! ${turn === "W" ? "Black" : "White"} wins.`);
+            endGameUI(`Timeout! ${turn === "W" ? "Black" : "White"} wins.`);
         } else {
             // Still running
             const newDisplayedSecond = Math.ceil(this.remainingTimeInMs / 1000);
@@ -1648,7 +2006,7 @@ function flipTimer(timer1, timer2) {
     timer2.toggle();
 }
 
-function endGame(message) {
+function endGameUI(message) {
     setMessage(message);
     blackTimer.stop();
     whiteTimer.stop();

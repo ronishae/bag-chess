@@ -201,6 +201,9 @@ async function checkAuth() {
     }
 }
 
+const joinBtn = document.getElementById("join-game-button");
+const codeInput = document.getElementById("game-code-input");
+
 async function createRoom() {
     await checkAuth();
     
@@ -222,7 +225,7 @@ async function createRoom() {
         if (!snapshot.exists()) {
             isUnique = true;
             await setDoc(doc(db, "games", gameId), initialState);
-
+            codeInput.value = gameId;
             syncUIDB(initialState); 
             console.log(`Success! Created room: ${gameId}`);
         }
@@ -240,8 +243,7 @@ document.getElementById("create-game-button").addEventListener("click", async ()
     alert(`Game created! Your game code is: ${gameId}`);
 });
 
-const joinBtn = document.getElementById("join-game-button");
-const codeInput = document.getElementById("game-code-input");
+
 
 function setLocalVariables(roomData) {
     if (!roomData) {

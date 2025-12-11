@@ -348,7 +348,7 @@ function setupGameListener() {
     console.log(`Listening for updates on room: ${currentGameId}...`);
     const gameRef = doc(db, "games", currentGameId);
 
-    unsubscribeFromGame = onSnapshot(gameRef, (docSnap) => {
+    onSnapshot(gameRef, (docSnap) => {
         if (docSnap.exists()) {
             const roomData = docSnap.data();
             

@@ -87,7 +87,7 @@ var lastClickedPieceLocation = null;
 // [piece, endCoordinate]
 var lastMove = {};
 
-// CONVERTS: 2D Array (Game) -> Object (Database)
+// 2D Array (Game) -> Object (Database)
 function packBoardForDB(boardArray) {
     const boardObj = {};
     boardArray.forEach((row, index) => {
@@ -97,10 +97,9 @@ function packBoardForDB(boardArray) {
     return boardObj;
 }
 
-// CONVERTS: Object (Database) -> 2D Array (Game)
+// Object (Database) -> 2D Array (Game)
 function unpackBoardFromDB(boardObj) {
     const boardArray = [];
-    // We assume standard chess size of 8 rows
     for (let i = 0; i < 8; i++) {
         // If the row is missing (error case), return an empty row
         boardArray.push(boardObj[i.toString()] || Array(8).fill("."));
@@ -110,7 +109,6 @@ function unpackBoardFromDB(boardObj) {
 
 var currentGameId = null;
 
-// A helper to generate the starting state for the DB
 function getInitialGameState() {
     return {
         created_at: Date.now(),
@@ -251,15 +249,12 @@ function setLocalVariables(roomData) {
         return;
     }
 
-    // 1. Board: Unpack the object back into a 2D array
     if (roomData.board) {
         boardState = unpackBoardFromDB(roomData.board);
     }
 
-    // 2. Simple Primitive Types (Strings, Numbers, Booleans)
     if (roomData.turn) turn = roomData.turn;
     
-    // 3. Castling Rights (Map the object back to your individual variables)
     if (roomData.castling) {
         whiteKingSidePossible = roomData.castling.w_king;
         whiteQueenSidePossible = roomData.castling.w_queen;
@@ -267,15 +262,13 @@ function setLocalVariables(roomData) {
         blackQueenSidePossible = roomData.castling.b_queen;
     }
 
-    // 4. Bags: Convert Arrays back to Sets
-    // Firestore stores them as ["p", "r"], but your logic needs new Set(["p", "r"])
+    // Convert Arrays back to Sets
     if (roomData.bags) {
         whiteBag = new Set(roomData.bags.white || []);
         blackBag = new Set(roomData.bags.black || []);
     }
 
-    // 5. Zobrist Hash: Convert String back to BigInt
-    // JSON cannot store BigInts (e.g., 1234n), so we stored them as strings "1234"
+    // Convert String back to BigInt
     if (roomData.zobristHash) {
         zobristHash = BigInt(roomData.zobristHash);
     }
@@ -284,17 +277,15 @@ function setLocalVariables(roomData) {
         zobristEnPassant = roomData.zobristEnPassant;
     }
 
-    // 6. Position History: Convert Object back to Map
-    // Firestore stored it as { "1234": 1 }, logic needs Map { 1234n => 1 }
+    // Convert Object back to Map
+    // DB stored it as { "1234": 1 }, logic needs Map { 1234n => 1 }
     if (roomData.positionHistory) {
         positionHistory = new Map();
         for (const [hashStr, count] of Object.entries(roomData.positionHistory)) {
-            // We must convert the key string back to BigInt to match your hash logic
             positionHistory.set(BigInt(hashStr), count);
         }
     }
 
-    // 7. Last Move
     if (roomData.lastMove) {
         lastMove = roomData.lastMove;
     } 
@@ -307,12 +298,10 @@ function setLocalVariables(roomData) {
         let serverBlackTime = roomData.timers.black;
         const lastTimestamp = roomData.timers.lastMoveTimestamp;
 
-        // ONLY calculate elapsed time if the game has actually started
-        // (i.e., we are not waiting for the very first move)
+        // only calculate elapsed time if the game has actually started
         if (lastTimestamp && !roomData.timers.waitingForWhiteFirstMove) {
             
             const elapsedMs = now - lastTimestamp;
-            // Deduct elapsed time from whoever's turn it is RIGHT NOW
             if (roomData.turn === "W") {
                 serverWhiteTime -= elapsedMs;
             } else {
@@ -327,6 +316,8 @@ function setLocalVariables(roomData) {
         blackTimer.stop();
         whiteTimer.updateDisplay();
         blackTimer.updateDisplay();
+
+        // set the correct timer to ticking
         if (roomData.turn === "W" && !waitingForWhiteFirstMove) {
             whiteTimer.start();
             blackTimer.stop();
@@ -446,12 +437,10 @@ function pieceFromCoordinate(coord) {
 }
 
 function removeElementsByClass(className) {
-    // 1. Select all matching elements
     const elements = document.querySelectorAll(`.${className}`);
 
-    // 2. Iterate and remove each element
-    // Note: The NodeList returned by querySelectorAll is static, so removing elements
-    // while iterating is safe.
+    // returned of querySelectorAll is static, so removing elements
+    // while iterating is safe
     elements.forEach((element) => {
         element.remove();
     });
@@ -492,9 +481,9 @@ function convertMoves(moves) {
     return moves.map(([r, c]) => toCoordinate(r, c));
 }
 
-// Function to generate a random 64-bit BigInt
+// generate a random 64-bit BigInt
 function generateRandomBigInt() {
-    // Generate four 16-bit numbers and combine them
+    // generate four 16-bit numbers and combine them
     const p1 = BigInt(Math.floor(Math.random() * 65536));
     const p2 = BigInt(Math.floor(Math.random() * 65536));
     const p3 = BigInt(Math.floor(Math.random() * 65536));
@@ -512,14 +501,14 @@ const NUM_SQUARES = 64;
 
 function initializeZobristKeys() {
     const keys = {
-        // Piece keys are now accessed by character and [row][col] index.
-        // Piece characters: P, N, B, R, Q, K, F (White) and p, n, b, r, q, k, f (Black)
+        // piece keys are now accessed by character and [row][col] index.
+        // piece characters: P, N, B, R, Q, K, F (White) and p, n, b, r, q, k, f (Black)
         pieces: {},
 
-        // Side to move (only one key for 'b' to toggle from 'w')
+        // side to move (only one key for 'b' to toggle from 'w')
         side: generateRandomBigInt(),
 
-        // Castling rights (4 keys for KQkq)
+        // castling rights (4 keys for KQkq)
         castling: {
             'K': generateRandomBigInt(), // White Kingside
             'Q': generateRandomBigInt(), // White Queenside
@@ -527,7 +516,7 @@ function initializeZobristKeys() {
             'q': generateRandomBigInt(), // Black Queenside
         },
 
-        // En Passant target files (8 keys for files a-h, or 0-7)
+        // en passant target files (8 keys for files a-h, or 0-7)
         enPassant: Array(8).fill(0).map(() => generateRandomBigInt()),
         bag: {},
     };
@@ -555,11 +544,11 @@ function initializeZobristKeys() {
 const zobristKeys = initializeZobristKeys();
 
 function checkThreeFoldRepetition() {
-    // Convert BigInt key to string for reliable Map lookup
+    // convert BigInt key to string for reliable Map lookup
     const hashString = zobristHash.toString();
     const count = positionHistory.get(hashString) || 0;
     
-    // If the hash has been seen twice before, the current position is the third instance.
+    // if the hash has been seen twice before, the current position is the third instance.
     return count >= 2; 
 }
 

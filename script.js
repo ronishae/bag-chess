@@ -38,7 +38,7 @@ const testBoard = [
 ];
 
 // set this to INIT or testBoard as needed
-var boardState = INIT;
+var boardState = structuredClone(INIT);
 const pieceList = ["p", "r", "n", "b", "q", "k"];
 const MAPPING = {
     f: "flag",
@@ -133,11 +133,14 @@ function getInitialGameState() {
             black: ["p", "r", "n", "b", "q", "k"]
         },
         
-        // TODO timers should store time remaining in DB
         timers: {
-            white: 600, // e.g., 10 minutes
-            black: 600,
-            lastMoveTimestamp: null // Needed to calculate elapsed time
+            white: 600 * 1000,
+            black: 600 * 1000,
+            lastMoveTimestamp: null, // Needed to calculate elapsed time
+            isWhite: true,
+            isBlack: false,
+            waitingForWhiteFirstMove: true,
+            waitingForBlackFirstMove: true,
         },
 
         // 6. Zobrist & History
@@ -170,9 +173,13 @@ function getCurrentGameStateForDB() {
         positionHistory: Object.fromEntries(positionHistory), 
         lastMove: lastMove,
         timers: {
-            white: 600, 
-            black: 600,
-            lastMoveTimestamp: Date.now()
+            white: whiteTimer.remainingTimeInMs, 
+            black: blackTimer.remainingTimeInMs,
+            lastMoveTimestamp: Date.now(),
+            isWhite: turn == "W",
+            isBlack: turn == "B",
+            waitingForWhiteFirstMove: waitingForWhiteFirstMove,
+            waitingForBlackFirstMove: waitingForBlackFirstMove
         }
     };
 }
@@ -205,6 +212,7 @@ async function createRoom() {
     // later can make it better
     while (!isUnique && attempts < 10) {
         gameId = generateRandomId(4);
+        currentGameId = gameId;
         attempts++;
 
         const gameRef = doc(db, 'games', gameId);
@@ -214,8 +222,12 @@ async function createRoom() {
         if (!snapshot.exists()) {
             isUnique = true;
             await setDoc(doc(db, "games", gameId), initialState);
+
+            syncUIDB(initialState); 
             console.log(`Success! Created room: ${gameId}`);
         }
+    
+        setupGameListener();
     }
     
     if (!isUnique) console.error("Could not find a unique ID after 10 tries.");
@@ -225,7 +237,6 @@ async function createRoom() {
 
 document.getElementById("create-game-button").addEventListener("click", async () => {
     const gameId = await createRoom();
-    setupGameListener();
     alert(`Game created! Your game code is: ${gameId}`);
 });
 
@@ -284,46 +295,59 @@ function setLocalVariables(roomData) {
     // 7. Last Move
     if (roomData.lastMove) {
         lastMove = roomData.lastMove;
-        
-        // OPTIONAL: Update "waiting for first move" flags based on game state
-        // If a move has been made, we are clearly not waiting for the very first move
-        waitingForWhiteFirstMove = false; 
-        waitingForBlackFirstMove = false;
-    } else {
-        // If lastMove is null, it's a fresh game
-        waitingForWhiteFirstMove = true;
-        waitingForBlackFirstMove = true;
-    }
+    } 
 
-    // 8. Timers
-    // NOTE: We do NOT set 'whiteTimer' or 'blackTimer' here directly.
-    // In your code, those variables likely hold the 'setInterval' IDs (integers), not the time remaining.
-    // You should probably update the UI display here, but not the interval ID variables.
-    // Example:
-    // if (roomData.timers) {
-    //     updateTimerDisplay(roomData.timers.white, roomData.timers.black);
-    // }
+    if (roomData.timers) {
+        const now = Date.now();
+        waitingForWhiteFirstMove = roomData.timers.waitingForWhiteFirstMove;
+        waitingForBlackFirstMove = roomData.timers.waitingForBlackFirstMove;
+        let serverWhiteTime = roomData.timers.white;
+        let serverBlackTime = roomData.timers.black;
+        const lastTimestamp = roomData.timers.lastMoveTimestamp;
+
+        // ONLY calculate elapsed time if the game has actually started
+        // (i.e., we are not waiting for the very first move)
+        if (lastTimestamp && !roomData.timers.waitingForWhiteFirstMove) {
+            
+            const elapsedMs = now - lastTimestamp;
+            // Deduct elapsed time from whoever's turn it is RIGHT NOW
+            if (roomData.turn === "W") {
+                serverWhiteTime -= elapsedMs;
+            } else {
+                serverBlackTime -= elapsedMs;
+            }
+        }
+
+        whiteTimer.setTime(serverWhiteTime);
+        blackTimer.setTime(serverBlackTime);
+        // stop to ensure if this is called on create game, any current timers are stopped
+        whiteTimer.stop();
+        blackTimer.stop();
+        whiteTimer.updateDisplay();
+        blackTimer.updateDisplay();
+        if (roomData.turn === "W" && !waitingForWhiteFirstMove) {
+            whiteTimer.start();
+            blackTimer.stop();
+        } else if (roomData.turn === "B" && !waitingForBlackFirstMove) {
+            whiteTimer.stop();
+            blackTimer.start();
+        }
+    }
     
     console.log("Local variables synced with DB!");
 }
 
-let unsubscribeFromGame = null; // We store this so we can stop listening later
 
+// TODO: might need ome extra logic to unsubscribe, not sure
 function setupGameListener() {
     if (!currentGameId) {
         console.error("No game ID found to listen to.");
         return;
     }
 
-    // 1. If we are already listening to a game, detach the old listener
-    // if (unsubscribeFromGame) {
-    //     unsubscribeFromGame();
-    // }
-
     console.log(`Listening for updates on room: ${currentGameId}...`);
     const gameRef = doc(db, "games", currentGameId);
 
-    // 2. Start the Real-Time Listener
     unsubscribeFromGame = onSnapshot(gameRef, (docSnap) => {
         if (docSnap.exists()) {
             const roomData = docSnap.data();
@@ -374,10 +398,10 @@ joinBtn.addEventListener("click", async () => {
             
             const roomData = roomSnap.data();
 
-            console.log("Successfully joined room:", currentGameId);
-            console.log("Current Room Data:", roomData.board);
             setupGameListener();
             syncUIDB(roomData);
+            whiteTimer.stop();
+            blackTimer.stop();
 
             alert(`Joined Room ${currentGameId}!`);
         } else {
@@ -1593,6 +1617,16 @@ async function makeMove(pieceType, startRow, startCol, event) {
     // toggle turn in zobrist hash
     zobristHash ^= zobristKeys.side;
     
+    if (turn === "W") {
+        var bagToHighlight = document.getElementById("white-bag");
+        var bagToUnhighlight = document.getElementById("black-bag");
+    } else {
+        var bagToHighlight = document.getElementById("black-bag");
+        var bagToUnhighlight = document.getElementById("white-bag");
+    }
+    bagToHighlight.classList.add("green-background");
+    bagToUnhighlight.classList.remove("green-background");
+
     clearIndicators();
     renderBoard(boardState);
 
@@ -1846,6 +1880,10 @@ class ChessTimer {
         this.updateDisplay(); // Show initial time
     }
 
+    setTime(timeInMs) {
+        this.remainingTimeInMs = Math.max(0, timeInMs);
+        this.updateDisplay();
+    }
 
     /**
      * Updates the timer's HTML element.

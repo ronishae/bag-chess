@@ -109,12 +109,18 @@ function unpackBoardFromDB(boardObj) {
 
 var currentGameId = null;
 
-function getInitialGameState() {
+function getInitialGameState(hostUid) {
     return {
         created_at: Date.now(),
 
         board: packBoardForDB(INIT), 
         
+        players: {
+            white: hostUid || null,
+            black: null
+        },
+        observers: [],
+
         turn: "W",
         status: "waiting",
         winner: null,
@@ -204,7 +210,9 @@ const codeInput = document.getElementById("game-code-input");
 
 async function createRoom() {
     await checkAuth();
-    
+    const auth = getAuth();
+    const myUid = auth.currentUser.uid; // Get unique ID
+
     let isUnique = false;
     let gameId = "";
     let attempts = 0;
@@ -219,7 +227,7 @@ async function createRoom() {
         const gameRef = doc(db, 'games', gameId);
 
         const snapshot = await getDoc(gameRef);
-        const initialState = getInitialGameState();
+        const initialState = getInitialGameState(myUid);
         if (!snapshot.exists()) {
             isUnique = true;
             await setDoc(doc(db, "games", gameId), initialState);
@@ -228,7 +236,7 @@ async function createRoom() {
             console.log(`Success! Created room: ${gameId}`);
         }
     
-        setupGameListener();
+        joinGame(gameId);
     }
     
     if (!isUnique) console.error("Could not find a unique ID after 10 tries.");
@@ -370,27 +378,53 @@ function syncUIDB (roomData) {
     renderBags();
 }
 
-joinBtn.addEventListener("click", async () => {
+async function joinGame(joinCode) {
     await checkAuth();
-    const enteredCode = codeInput.value.trim().toUpperCase();
-    console.log(enteredCode);
-    if (!enteredCode) {
+    const auth = getAuth();
+    const myUid = auth.currentUser.uid;
+
+    if (!joinCode) {
         alert("Please enter a game code!");
         return;
     }
 
-    console.log(`Attempting to join room: ${enteredCode}...`);
+    console.log(`Attempting to join room: ${joinCode}...`);
 
     try {
-        const roomRef = doc(db, "games", enteredCode);
+        const roomRef = doc(db, "games", joinCode);
 
         const roomSnap = await getDoc(roomRef);
 
         if (roomSnap.exists()) {
-            currentGameId = enteredCode;
+            currentGameId = joinCode;
             
             const roomData = roomSnap.data();
+            
+            let myRole = "W";
 
+            if (roomData.players.white === myUid) {
+                console.log("Welcome back, Host!");
+                myRole = "W";
+            } 
+
+            else if (roomData.players.black === myUid) {
+                console.log("Welcome back, Player 2!");
+                myRole = "B";
+            }
+
+            else if (roomData.players.black === null) {
+                console.log("New challenger approaching!");
+                myRole = "B";
+                // CLAIM THE SPOT IN THE DB
+                await updateDoc(roomRef, {
+                    "players.black": myUid
+                });
+            } else {
+                console.log("Room is full. Watching as spectator.");
+                myRole = "W"; 
+            }
+            
+            setBoardOrientation(myRole);
             setupGameListener();
             syncUIDB(roomData);
             whiteTimer.stop();
@@ -407,6 +441,12 @@ joinBtn.addEventListener("click", async () => {
         console.error("Error joining room:", error);
         currentGameId = null;
     }
+
+}
+
+joinBtn.addEventListener("click", async () => {
+    const enteredCode = codeInput.value.trim().toUpperCase();
+    await joinGame(enteredCode);
 });
 
 
@@ -1497,6 +1537,23 @@ function flipPiecesEnabled() {
     }
 }
 
+function setBoardOrientation(color) {
+    const boardElement = document.getElementById("board");
+    const images = document.getElementsByClassName("piece-image");
+    
+    if (color === "B") {
+        boardElement.classList.add("flipped");
+        for (const img of images) {
+            img.classList.add("flipped");
+        }
+    } else {
+        boardElement.classList.remove("flipped");
+        for (const img of images) {
+            img.classList.remove("flipped");
+        }
+    }
+}
+
 async function makeMove(pieceType, startRow, startCol, event) {
     flipPiecesEnabled();
 
@@ -1619,6 +1676,11 @@ async function makeMove(pieceType, startRow, startCol, event) {
     bagToUnhighlight.classList.remove("green-background");
 
     clearIndicators();
+    // only flip when playing locally
+    if (!currentGameId) {
+        setBoardOrientation(turn);
+    }
+    
     renderBoard(boardState);
 
     if (currentGameId) {

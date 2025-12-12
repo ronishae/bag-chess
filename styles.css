@@ -317,3 +317,14 @@ p {
         margin: 0px;
     }
 }
+
+/* Rotates the entire board 180 degrees */
+.flipped {
+    transform: rotate(180deg);
+}
+
+/* Rotates pieces and labels back so they appear upright */
+.flipped .piece-image, 
+.flipped .coord-label { 
+    transform: rotate(180deg);
+}

@@ -408,6 +408,7 @@ async function joinGame(joinCode) {
             const roomData = roomSnap.data();
             
             let myRole = "W";
+            let isSpectator = false;
 
             if (roomData.players.white === myUid) {
                 console.log("Welcome back, Host!");
@@ -428,6 +429,7 @@ async function joinGame(joinCode) {
                 });
             } else {
                 console.log("Room is full. Watching as spectator.");
+                isSpectator = true;
                 myRole = "W"; 
             }
             
@@ -437,7 +439,7 @@ async function joinGame(joinCode) {
             whiteTimer.stop();
             blackTimer.stop();
 
-            alert(`Joined Room ${currentGameId}!`);
+            alert(`Joined Room ${currentGameId} as ${isSpectator ? "a spectator": (myRole === "W") ? "white" : "black"}!`);
         } else {
             currentGameId = null;
             console.log("Room not found.");

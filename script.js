@@ -11,6 +11,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const LIFETIME = ONE_HOUR_MS;
+
 const SIZE = 8;
 
 // do not change this; use for final implementation
@@ -112,9 +116,12 @@ function unpackBoardFromDB(boardObj) {
 var currentGameId = null;
 
 function getInitialGameState(hostUid) {
-    return {
-        created_at: Date.now(),
+    
+    const expirationDate = new Date(Date.now() + LIFETIME);
 
+    return {
+        createdAt: Date.now(),
+        expireAt: expirationDate,
         board: packBoardForDB(INIT), 
         
         players: {
@@ -161,6 +168,7 @@ function getInitialGameState(hostUid) {
 
 function getCurrentGameStateForDB() {
     return {
+        expireAt: new Date(Date.now() + LIFETIME),
         board: packBoardForDB(boardState),
         turn: turn,
         castling: {

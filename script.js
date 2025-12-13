@@ -371,8 +371,7 @@ function setupGameListener() {
             console.log("Database update received!");
             syncUIDB(roomData);
         } else {
-            console.log("Game room deleted or does not exist.");
-            // Handle game over / room closed logic here
+            alert("Error: game room deleted or does not exist.");
         }
     });
 }

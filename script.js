@@ -86,6 +86,8 @@ var whiteKingSidePossible = true;
 var lastClickedPieceLocation = null;
 // [piece, endCoordinate]
 var lastMove = {};
+var whiteUid = null;
+var blackUid = null;
 
 // 2D Array (Game) -> Object (Database)
 function packBoardForDB(boardArray) {
@@ -332,6 +334,11 @@ function setLocalVariables(roomData) {
         } else if (roomData.turn === "B" && !waitingForBlackFirstMove) {
             whiteTimer.stop();
             blackTimer.start();
+        }
+
+        if (roomData.players) {
+            whiteUid = roomData.players.white;
+            blackUid = roomData.players.black;
         }
     }
     
@@ -1836,6 +1843,13 @@ function renderBoard(board) {
     const check = isInCheck(boardState, turn);
     const [checkedRow, checkedCol] = locateKing(boardState, turn);
 
+    let uid = null;
+    if (currentGameId) {
+        const auth = getAuth();
+        uid = auth.currentUser.uid;
+        console.log(whiteUid, blackUid, uid);
+    }
+
     for (let row = 0; row < SIZE; row++) {
         for (let col = 0; col < SIZE; col++) {
             if (board[row][col] === ".") continue;
@@ -1847,8 +1861,8 @@ function renderBoard(board) {
             // activate button and attach handler
             button.classList.add("piece-button");
             if (
-                (isBlackPiece(board[row][col]) && turn === "B") ||
-                (!isBlackPiece(board[row][col]) && turn === "W")
+                (isBlackPiece(board[row][col]) && turn === "B" && (!uid || uid == blackUid)) ||
+                (!isBlackPiece(board[row][col]) && turn === "W" && (!uid || uid == whiteUid))
             ) {
                 button.addEventListener("click", handlePieceClick);
                 button.addEventListener("dragstart", handleDragStart);

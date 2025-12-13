@@ -1546,11 +1546,17 @@ function setBoardOrientation(color) {
         for (const img of images) {
             img.classList.add("flipped");
         }
+        document.getElementById("game-container").classList.add("flipped-board");
+        document.getElementById("black-bag").classList.add("flipped-board");
+        document.getElementById("white-bag").classList.add("flipped-board");
     } else {
         boardElement.classList.remove("flipped");
         for (const img of images) {
             img.classList.remove("flipped");
         }
+        document.getElementById("game-container").classList.remove("flipped-board");
+        document.getElementById("black-bag").classList.remove("flipped-board");
+        document.getElementById("white-bag").classList.remove("flipped-board");
     }
 }
 

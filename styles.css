@@ -60,10 +60,16 @@ body {
     font-weight: 600;
 }
 
-#game-container {
+#game-container, #game-container.flipped-board {
     display: grid;
     grid-template-columns: 1fr 0.8fr;
     grid-template-rows: 1fr 0.5fr 0.5fr 0.5fr 0.5fr 1fr;
+    user-select: none;  
+    margin: 5px;
+    column-gap: 20px;
+}
+
+#game-container {
     grid-template-areas:
         "board black-bag"
         "board black-timer"
@@ -71,9 +77,6 @@ body {
         "board message"
         "board white-timer"
         "board white-bag";
-    user-select: none;  
-    margin: 5px;
-    column-gap: 20px;
 }
 
 #rules {
@@ -115,6 +118,7 @@ p {
 
 #black-bag {
     grid-area: black-bag;
+    align-self: start;
 }
 
 #white-bag {
@@ -327,4 +331,23 @@ p {
 .flipped .piece-image, 
 .flipped .coord-label { 
     transform: rotate(180deg);
+}
+
+#game-container.flipped-board {
+    grid-template-areas:
+        "board white-bag"
+        "board white-timer"
+        "board message"
+        "board message"
+        "board black-timer"
+        "board black-bag";
+}
+
+/* need to flip gravity as well when flipping sides */
+#white-bag.flipped-board {
+    align-self: start;
+}
+
+#black-bag.flipped-board {
+    align-self: end;
 }

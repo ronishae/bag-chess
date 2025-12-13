@@ -280,48 +280,6 @@ p {
     box-sizing: border-box; 
 }
 
-
-@media (max-width: 768px) {
-    #game-container {
-        grid-template-columns: 1fr; 
-        grid-template-rows: auto;   
-        
-        grid-template-areas:
-            "black-bag"
-            "black-timer"
-            "board"
-            "message"
-            "white-timer"
-            "white-bag";
-            
-        column-gap: 0;
-        row-gap: 10px;
-        
-        justify-items: center; 
-    }
-
-    #white-bag, #black-bag, #white-timer, #black-timer, #game-status-message, #board {
-        width: 100%;
-        box-sizing: border-box;
-    }
-
-    .bag-image {
-        width: 11vw;      
-        height: 11vw;
-        max-width: 50px;
-        max-height: 50px;
-    }
-
-    .coord-label {
-        font-size: 2.5vw;
-        left: auto;    
-        top: auto;     
-        right: 2px;    
-        bottom: 0px;
-        margin: 0px;
-    }
-}
-
 /* Rotates the entire board 180 degrees */
 .flipped {
     transform: rotate(180deg);
@@ -351,3 +309,55 @@ p {
 #black-bag.flipped-board {
     align-self: end;
 }
+
+@media (max-width: 768px) {
+    #game-container, #game-container.flipped-board {
+        grid-template-columns: 1fr; 
+        grid-template-rows: auto;   
+        column-gap: 0;
+        row-gap: 10px;
+        justify-items: center; 
+    }
+
+    #game-container {
+        grid-template-areas:
+            "black-bag"
+            "black-timer"
+            "board"
+            "message"
+            "white-timer"
+            "white-bag";
+    }
+
+    #game-container.flipped-board {
+        grid-template-areas:
+            "white-bag"
+            "white-timer"
+            "board"
+            "message"
+            "black-timer"
+            "black-bag";
+    }
+
+    #white-bag, #black-bag, #white-timer, #black-timer, #game-status-message, #board {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .bag-image {
+        width: 11vw;      
+        height: 11vw;
+        max-width: 50px;
+        max-height: 50px;
+    }
+
+    .coord-label {
+        font-size: 2.5vw;
+        left: auto;    
+        top: auto;     
+        right: 2px;    
+        bottom: 0px;
+        margin: 0px;
+    }
+}
+

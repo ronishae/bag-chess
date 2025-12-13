@@ -14,6 +14,9 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const LIFETIME = ONE_HOUR_MS;
+const captureSound = new Audio('sounds/capture.mp3');
+const checkSound = new Audio('sounds/check.mp3');
+const moveSound = new Audio('sounds/move.mp3');
 
 const SIZE = 8;
 
@@ -1596,6 +1599,8 @@ async function makeMove(pieceType, startRow, startCol, event) {
     const endingSquare = parent.id;
     const [endRow, endCol] = fromCoordinate(endingSquare);
 
+    const isCapture = !isEmptySquare(boardState, endRow, endCol);
+
     // Handle en passant for Zobrist hashing
     clearOldEnPassantHash();
     let newEnPassantCol = -1;
@@ -1703,6 +1708,16 @@ async function makeMove(pieceType, startRow, startCol, event) {
         setBoardOrientation(turn);
     }
     
+    if (isInCheck(boardState, turn)) {
+        checkSound.play();
+    }
+    else if (isCapture) {
+        captureSound.play();
+    }
+    else {
+        moveSound.play();
+    }
+
     renderBoard(boardState);
 
     if (currentGameId) {

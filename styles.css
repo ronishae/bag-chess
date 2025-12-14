@@ -24,6 +24,11 @@ body {
 
 #game-status-message {
     color: #036b87;
+    text-align: center;
+}
+
+.hidden {
+    display: none;
 }
 
 .rule-card {

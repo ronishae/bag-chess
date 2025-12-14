@@ -66,6 +66,8 @@ var waitingForWhiteFirstMove = true;
 var waitingForBlackFirstMove = true;
 
 var turn = "W"; // 'W' for White's turn, 'B' for Black
+var gameStatus = "waiting"; // 'waiting', 'started', 'ended'
+var gameMessage = "Welcome!";
 var zobristHash = 0n;
 var zobristEnPassant = -1; // only one file can be a target, -1 for none
 // maps zobrist hash to frequency of occurrence
@@ -134,9 +136,13 @@ function getInitialGameState(hostUid) {
         observers: [],
 
         turn: "W",
-        status: "waiting",
-        winner: null,
-        
+        status: "waiting",  // waiting, started, ended
+        whiteMessage: "Welcome!",
+        blackMessage: "Welcome!",
+        rematch: {
+            white: false,
+            black: false
+        },
         castling: {
             w_king: true, // whiteKingSidePossible
             w_queen: true, // whiteQueenSidePossible
@@ -258,8 +264,7 @@ async function createRoom() {
 }
 
 document.getElementById("create-game-button").addEventListener("click", async () => {
-    const gameId = await createRoom();
-    alert(`Game created! Your game code is: ${gameId}`);
+    await createRoom();
 });
 
 
@@ -281,6 +286,14 @@ function setLocalVariables(roomData) {
         whiteQueenSidePossible = roomData.castling.w_queen;
         blackKingSidePossible = roomData.castling.b_king;
         blackQueenSidePossible = roomData.castling.b_queen;
+    }
+
+    if (roomData.status) {
+        gameStatus = roomData.status;
+    }
+
+    if (roomData.message) {
+        gameMessage = roomData.message;
     }
 
     // Convert Arrays back to Sets
@@ -352,8 +365,6 @@ function setLocalVariables(roomData) {
             blackUid = roomData.players.black;
         }
     }
-    
-    console.log("Local variables synced with DB!");
 }
 
 
@@ -373,16 +384,35 @@ function setupGameListener() {
             
             console.log("Database update received!");
             syncUIDB(roomData);
+            if (roomData.rematch.white && roomData.rematch.black) {
+                // the rematch values will be set back to false in the handleRematch function
+                handleRematch();
+            }
         } else {
             alert("Error: game room deleted or does not exist.");
         }
     });
 }
 
+// this function may be called to update local too when we pass in some dummy room data
 function syncUIDB (roomData) {
     setLocalVariables(roomData);
+    if (roomData.status === "ended") {
+        rematchButton.classList.remove("hidden");
+    }
     clearIndicators();
     renderBoard(boardState);
+    if (currentGameId) {
+        const auth = getAuth();
+        const uid = auth.currentUser.uid;
+        if (roomData.whiteMessage && uid === roomData.players.white) {
+            setMessage(roomData.whiteMessage || "");
+        }
+        if (roomData.blackMessage && uid === roomData.players.black) {
+            setMessage(roomData.blackMessage || "");
+        }
+    }
+    
     if (roomData.turn === "W") {
         var bagToHighlight = document.getElementById("white-bag");
         var bagToUnhighlight = document.getElementById("black-bag");
@@ -433,9 +463,10 @@ async function joinGame(joinCode) {
             else if (roomData.players.black === null) {
                 console.log("New challenger approaching!");
                 myRole = "B";
-                // CLAIM THE SPOT IN THE DB
+                // claim spot and start the game
                 await updateDoc(roomRef, {
-                    "players.black": myUid
+                    "players.black": myUid,
+                    "status": "started"
                 });
             } else {
                 console.log("Room is full. Watching as spectator.");
@@ -1216,15 +1247,6 @@ function getLegalMoves(startRow, startCol, pieceType, moves) {
     return filtered;
 }
 
-function endGame() {
-    // disable all piece dragging and clicking
-    const pieces = document.getElementsByClassName("piece-button");
-    for (const piece of pieces) {
-        piece.draggable = false;
-        piece.removeEventListener("click", handlePieceClick);
-        piece.style.cursor = "default";
-    }
-}
 
 function detectEndOfGame() {
     if (checkThreeFoldRepetition()) {
@@ -2112,12 +2134,103 @@ function flipTimer(timer1, timer2) {
     timer2.toggle();
 }
 
-function endGameUI(message) {
+const rematchButton = document.getElementById("rematch-button"); 
+rematchButton.addEventListener("click", requestRematch);
+async function endGameUI(message) {
     setMessage(message);
     blackTimer.stop();
     whiteTimer.stop();
     disablePieces("B");
     disablePieces("W");
+    rematchButton.classList.remove("hidden"); 
+    if (currentGameId) {
+        const roomRef = doc(db, "games", currentGameId);
+        const roomSnap = await getDoc(roomRef);
+        if (roomSnap.exists()) {
+            await updateDoc(roomRef, {
+                "whiteMessage": message,
+                "blackMessage": message,
+                "status": "ended"
+            });
+        } 
+    }
+    else {
+        rematchButton.textContent = "Start New Game";
+    }
+}
+
+async function requestRematch() {
+    if (!currentGameId) {
+        handleRematch(); // instantly start new local game
+        return;
+    }
+    const gameRef = doc(db, "games", currentGameId);
+    const roomSnap = await getDoc(gameRef);
+    if (!roomSnap.exists()) return;
+    const currentData = roomSnap.data();
+    const auth = getAuth();
+    const uid = auth.currentUser.uid;
+
+    // TODO: there might be a quick flash on the second rematch request
+    // since we set message now but message gets set again on rematch start
+    if (uid === currentData.players.white) {
+        await updateDoc(gameRef, {
+            "rematch.white": true,
+            "whiteMessage": "Rematch Requested!",
+            "blackMessage": "Opponent Requested Rematch!"
+        });
+    } else if (uid === currentData.players.black) {
+        await updateDoc(gameRef, {
+            "rematch.black": true,
+            "blackMessage": "Rematch Requested!",
+            "whiteMessage": "Opponent Requested Rematch!"
+        });
+    }
+    else {
+        // observer
+        return;
+    }
+}
+
+async function handleRematch() {
+    rematchButton.classList.add("hidden");
+
+    setMessage("");
+
+    // local game
+    if (!currentGameId) {
+        const freshState = getInitialGameState(null); 
+        syncUIDB(freshState);
+        setBoardOrientation("W");
+        return;
+    }
+
+    // online game
+    const gameRef = doc(db, "games", currentGameId);
+    
+    const roomSnap = await getDoc(gameRef);
+    if (!roomSnap.exists()) return;
+    const currentData = roomSnap.data();
+
+    const newState = getInitialGameState(null);
+
+    // swap colours
+    if (currentData.players) {
+        newState.players = {
+            white: currentData.players.black,
+            black: currentData.players.white
+        };
+    }
+
+    await setDoc(gameRef, newState);
+    const auth = getAuth();
+    const uid = auth.currentUser.uid;
+    if (uid === newState.players.white) {
+        setBoardOrientation("W");
+    } else if (uid === newState.players.black) {
+        setBoardOrientation("B");
+    }
+    console.log("Rematch started! Players swapped.");
 }
 
 function setMessage(text) {

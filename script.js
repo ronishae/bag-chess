@@ -226,7 +226,13 @@ async function checkAuth() {
 
 const joinBtn = document.getElementById("join-game-button");
 const codeInput = document.getElementById("game-code-input");
-
+const copyBtn = document.getElementById("copy-code-button");
+copyBtn.addEventListener("click", copyCode);
+function copyCode() {
+    codeInput.select();
+    codeInput.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(codeInput.value);
+}
 async function createRoom() {
     await checkAuth();
     const auth = getAuth();

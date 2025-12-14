@@ -225,6 +225,10 @@ async function checkAuth() {
 }
 
 const joinBtn = document.getElementById("join-game-button");
+joinBtn.addEventListener("click", async () => {
+    const enteredCode = codeInput.value.trim().toUpperCase();
+    await joinGame(enteredCode);
+});
 const codeInput = document.getElementById("game-code-input");
 const copyBtn = document.getElementById("copy-code-button");
 copyBtn.addEventListener("click", copyCode);
@@ -233,6 +237,13 @@ function copyCode() {
     codeInput.setSelectionRange(0, 99999);
     navigator.clipboard.writeText(codeInput.value);
 }
+
+// make so when we press enter it joins as well
+codeInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        joinBtn.click();
+    }
+});
 async function createRoom() {
     await checkAuth();
     const auth = getAuth();
@@ -499,11 +510,6 @@ async function joinGame(joinCode) {
     }
 
 }
-
-joinBtn.addEventListener("click", async () => {
-    const enteredCode = codeInput.value.trim().toUpperCase();
-    await joinGame(enteredCode);
-});
 
 
 
